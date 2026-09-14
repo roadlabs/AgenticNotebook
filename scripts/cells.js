@@ -84,24 +84,6 @@ window.Anb = window.Anb || {};
     saveNotebookDebounced();
   }
 
-  // Move a cell up (-1) or down (+1). Re-renders and refocuses the moved
-  // cell so the user can keep editing.
-  function moveCell(id, delta) {
-    const idx = cells.findIndex((c) => c.id === id);
-    if (idx < 0) return;
-    const target = idx + delta;
-    if (target < 0 || target >= cells.length) return;
-
-    [cells[idx], cells[target]] = [cells[target], cells[idx]];
-    rerenderAll();
-    saveNotebookDebounced();
-
-    const moved = cells[target];
-    if (moved && moved.cm) {
-      setTimeout(() => editor.focus(moved.cm), 50);
-    }
-  }
-
   function clearAllOutputs() {
     if (!confirm('Clear all cell outputs?')) return;
     for (const cell of cells) {
@@ -364,18 +346,6 @@ ${cellsHtml}
     toggleBtn.title = 'Show preview (rendered markdown)';
     toggleBtn.addEventListener('click', () => toggleCellPreview(cell.id));
 
-    const moveUpBtn = document.createElement('button');
-    moveUpBtn.className = 'cell-btn cell-move-up';
-    moveUpBtn.textContent = '⬆️';
-    moveUpBtn.title = 'Move cell up';
-    moveUpBtn.addEventListener('click', () => moveCell(id, -1));
-
-    const moveDownBtn = document.createElement('button');
-    moveDownBtn.className = 'cell-btn cell-move-down';
-    moveDownBtn.textContent = '⬇️';
-    moveDownBtn.title = 'Move cell down';
-    moveDownBtn.addEventListener('click', () => moveCell(id, +1));
-
     const insertAboveBtn = document.createElement('button');
     insertAboveBtn.className = 'cell-btn cell-insert-above';
     insertAboveBtn.textContent = '⏫';
@@ -395,26 +365,15 @@ ${cellsHtml}
     delBtn.addEventListener('click', () => deleteCell(cell.id));
 
     toolbar.appendChild(runBtn);
-    toolbar.appendChild(clearOutputBtn);
     toolbar.appendChild(toggleBtn);
-    toolbar.appendChild(moveUpBtn);
-    toolbar.appendChild(moveDownBtn);
     toolbar.appendChild(insertAboveBtn);
     toolbar.appendChild(insertBelowBtn);
+    toolbar.appendChild(clearOutputBtn);
     toolbar.appendChild(delBtn);
 
-    // Disable the boundary buttons (first cell can't move up, last can't
-    // move down). Refreshed whenever the cell array is reordered.
     function idxOf(id) {
       return cells.findIndex((c) => c.id === id);
     }
-    function refreshBoundaryButtons() {
-      const idx = idxOf(cell.id);
-      moveUpBtn.disabled = idx <= 0;
-      moveDownBtn.disabled = idx < 0 || idx >= cells.length - 1;
-    }
-    refreshBoundaryButtons();
-    cell.boundaryRefresh = refreshBoundaryButtons;
     topBar.appendChild(label);
     topBar.appendChild(toolbar);
     cellEl.appendChild(topBar);
@@ -505,11 +464,6 @@ ${cellsHtml}
     }));
     notebookEl.innerHTML = '';
     render(dataSnapshot);
-    // Refresh move-up/down button disabled states on every cell now that
-    // the array order has been re-derived.
-    for (const c of cells) {
-      if (typeof c.boundaryRefresh === 'function') c.boundaryRefresh();
-    }
   }
 
   function refreshLabel(cell) {
@@ -763,7 +717,6 @@ ${cellsHtml}
     render,
     addCell,
     deleteCell,
-    moveCell,
     clearAllOutputs,
     clearCellOutput,
     runCell,
