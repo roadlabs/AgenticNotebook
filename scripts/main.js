@@ -77,9 +77,8 @@
       }
     });
 
-    // Inline rename: click name or ✏ button
+    // Inline rename: click the notebook name
     document.getElementById('current-notebook-name').addEventListener('click', renameCurrentNotebook);
-    document.getElementById('btn-rename-notebook').addEventListener('click', renameCurrentNotebook);
 
     // 7. Menu actions
     document.querySelectorAll('.menu-items > li[data-action]').forEach((li) => {
@@ -113,9 +112,6 @@
         case 'save-notebook':
           await saveNotebook();
           flashStatus(savePending ? 'Nothing to save.' : 'Notebook saved.');
-          break;
-        case 'rename-notebook':
-          await renameCurrentNotebook();
           break;
         case 'import-notebook':
           await actionImportFromJson();
