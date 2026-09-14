@@ -141,25 +141,40 @@ body {
   align-items: center;
 }
 
-.toolbar button {
+/* Uniform icon buttons (used by the top-right toolbar).
+   Each button is a square 36×36 box holding a single colored emoji;
+   `title` attribute provides the function-name tooltip on hover. */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 1px solid var(--border);
+  border-radius: 6px;
   color: var(--text-primary);
-  padding: 6px 12px;
-  border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
-  font-family: inherit;
-  transition: background 0.1s, border-color 0.1s;
+  font-size: 18px;
+  line-height: 1;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji',
+               'Segoe UI Symbol', 'EmojiOne Color', sans-serif;
+  transition: background 0.12s, border-color 0.12s, transform 0.06s;
 }
 
-.toolbar button:hover {
+.icon-btn:hover {
   background: var(--bg-root);
   border-color: var(--accent);
-  color: var(--accent);
+  transform: translateY(-1px);
 }
 
-.toolbar button:active { transform: translateY(1px); }
+.icon-btn:active { transform: translateY(0); }
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* ---------- Notebook container ---------- */
 #notebook {

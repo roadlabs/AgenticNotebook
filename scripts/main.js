@@ -134,7 +134,7 @@
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
     const btn = document.getElementById('btn-theme');
-    if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
+    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
 
     const cmTheme = Anb.editor.getCurrentCMTheme();
     for (const cell of Anb.cells.getCells()) {
