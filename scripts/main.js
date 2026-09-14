@@ -228,7 +228,7 @@
   function updateNotebookSlot() {
     const el = document.getElementById('current-notebook-name');
     if (!el) return;
-    el.textContent = '📓 ' + Anb.notebooks.getName();
+    el.textContent = Anb.notebooks.getName();
   }
 
   // --- Open modal ----------------------------------------------------------

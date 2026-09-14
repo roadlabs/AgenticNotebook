@@ -75,7 +75,7 @@ body {
 
 .brand {
   font-weight: 600;
-  font-size: 15px;
+  font-size: 18px;
   white-space: nowrap;
 }
 
@@ -152,7 +152,7 @@ body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 6px;
   color: var(--text-primary);
   cursor: pointer;
