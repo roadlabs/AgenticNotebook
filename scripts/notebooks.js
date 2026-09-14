@@ -54,7 +54,7 @@ window.Anb = window.Anb || {};
     // First-ever run, or the currentNotebookId was deleted out from under us
     if (!currentNotebookId || !allNotebooks[currentNotebookId]) {
       const id = newId();
-      allNotebooks[id] = makeBlankNotebook(id, 'Untitled Notebook');
+      allNotebooks[id] = makeBlankNotebook(id, 'untitle');
       currentNotebookId = id;
       await Anb.storage.set('notebooks', allNotebooks);
       await Anb.storage.set('currentNotebookId', currentNotebookId);
@@ -74,7 +74,7 @@ window.Anb = window.Anb || {};
 
   function getName() {
     const nb = getCurrent();
-    return nb ? nb.name : 'Untitled Notebook';
+    return nb ? nb.name : 'untitle';
   }
 
   function getId() {
@@ -120,9 +120,9 @@ window.Anb = window.Anb || {};
 
   // --- write-side (notebook list) -----------------------------------------
 
-  async function createNew(name = 'Untitled Notebook') {
+  async function createNew(name = 'untitle') {
     const id = newId();
-    allNotebooks[id] = makeBlankNotebook(id, name || 'Untitled Notebook');
+    allNotebooks[id] = makeBlankNotebook(id, name || 'untitle');
     currentNotebookId = id;
     await Anb.storage.set('notebooks', allNotebooks);
     await Anb.storage.set('currentNotebookId', currentNotebookId);
@@ -152,7 +152,7 @@ window.Anb = window.Anb || {};
       } else {
         // Always keep at least one notebook alive
         const id2 = newId();
-        allNotebooks[id2] = makeBlankNotebook(id2, 'Untitled Notebook');
+        allNotebooks[id2] = makeBlankNotebook(id2, 'untitle');
         currentNotebookId = id2;
         await Anb.storage.set('notebooks', allNotebooks);
         await Anb.storage.set('currentNotebookId', currentNotebookId);

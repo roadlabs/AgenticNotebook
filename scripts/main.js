@@ -167,9 +167,9 @@
   async function actionNewNotebook() {
     // Flush any pending changes for the current notebook first
     await saveNotebook();
-    const name = window.prompt('Name for the new notebook:', 'Untitled Notebook');
+    const name = window.prompt('Name for the new notebook:', 'untitle');
     if (name === null) return;
-    await Anb.notebooks.createNew(name.trim() || 'Untitled Notebook');
+    await Anb.notebooks.createNew(name.trim() || 'untitle');
     Anb.cells.render(Anb.notebooks.getCurrentCells());
     const first = Anb.cells.getCells()[0];
     if (first && first.cm) setTimeout(() => Anb.editor.focus(first.cm), 50);
