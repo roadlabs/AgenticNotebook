@@ -31,11 +31,15 @@ window.Anb = window.Anb || {};
       content: c.content || '',
       output: c.output || '',
       status: 'idle',
+      previewMode: false,
       cm: null,
       cellEl: null,
       outputEl: null,
       runBtn: null,
-      labelEl: null
+      labelEl: null,
+      toggleBtn: null,
+      inputHost: null,
+      previewEl: null
     }));
 
     if (cells.length === 0) {
@@ -217,6 +221,125 @@ Respond only to the current cell, using prior cells as background.`;
     URL.revokeObjectURL(url);
   }
 
+  function openFromFile() {
+    const hasContent = cells.some((c) => c.content.trim() || c.output.trim());
+    if (hasContent && !confirm('Replace current notebook with the one from file?')) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          const ok = loadNotebookData(data);
+          if (!ok) alert('Invalid notebook file: missing or malformed "cells" array.');
+        } catch (err) {
+          alert('Failed to parse JSON: ' + err.message);
+        }
+      };
+      reader.onerror = () => alert('Failed to read file.');
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  function loadNotebookData(data) {
+    if (!data || !Array.isArray(data.cells)) return false;
+    const valid = data.cells.every(
+      (c) =>
+        c &&
+        typeof c === 'object' &&
+        typeof c.id === 'string' &&
+        typeof c.content === 'string' &&
+        typeof c.output === 'string'
+    );
+    if (!valid) return false;
+
+    const cellsData = data.cells.map((c) => ({
+      id: c.id,
+      content: c.content,
+      output: c.output
+    }));
+    if (cellsData.length === 0) {
+      cellsData.push({ id: newId(), content: '', output: '' });
+    }
+    render(cellsData);
+    saveNotebookDebounced();
+
+    const first = getCells()[0];
+    if (first && first.cm) {
+      setTimeout(() => editor.focus(first.cm), 50);
+    }
+    return true;
+  }
+
+  function exportNotebookHtml() {
+    const cellsHtml = cells.map((c, i) => {
+      const inputHtml = c.content ? renderMarkdown(c.content) : '';
+      const outputHtml = c.output ? renderMarkdown(c.output) : '';
+      return `    <section class="cell">
+      <header class="cell-label">[${i + 1}]</header>
+${inputHtml ? `      <div class="cell-input">${inputHtml}</div>\n` : ''}${outputHtml ? `      <div class="cell-output">${outputHtml}</div>\n` : ''}    </section>`;
+    }).join('\n');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AgenticNotebook Export</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 900px; margin: 0 auto; padding: 24px; background: #fafafa; color: #1a1a1a; }
+  h1.title { font-size: 22px; margin: 0 0 4px; }
+  .meta { color: #888; font-size: 12px; margin-bottom: 24px; }
+  .cell { background: #fff; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 16px; overflow: hidden; }
+  .cell-label { font-family: 'JetBrains Mono', 'Menlo', monospace; font-size: 12px; color: #888; padding: 6px 12px; background: #f5f5f5; border-bottom: 1px solid #eee; }
+  .cell-input { padding: 12px 16px; background: #fff; border-bottom: 1px solid #eee; }
+  .cell-output { padding: 12px 16px; background: #fafafa; }
+  /* Markdown typography */
+  h1, h2, h3, h4, h5, h6 { margin: 14px 0 8px; font-weight: 600; line-height: 1.3; }
+  h1 { font-size: 22px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+  h2 { font-size: 19px; }
+  h3 { font-size: 16px; }
+  h4 { font-size: 15px; }
+  p { margin: 8px 0; }
+  ul, ol { padding-left: 24px; margin: 8px 0; }
+  li { margin: 2px 0; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'JetBrains Mono', 'Menlo', monospace; font-size: 0.9em; }
+  pre { background: #1e1e1e; color: #e6e6e6; padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 8px 0; font-size: 13px; }
+  pre code { background: transparent; padding: 0; color: inherit; }
+  blockquote { border-left: 3px solid #1f6feb; margin: 8px 0; padding: 4px 12px; color: #555; }
+  a { color: #1f6feb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  table { border-collapse: collapse; margin: 8px 0; }
+  th, td { border: 1px solid #ddd; padding: 6px 12px; }
+  th { background: #f5f5f5; font-weight: 600; }
+  hr { border: none; border-top: 1px solid #eee; margin: 12px 0; }
+  .katex-display { margin: 12px 0; overflow-x: auto; }
+  .katex { font-size: 1.05em; white-space: nowrap; }
+</style>
+</head>
+<body>
+  <h1 class="title">📓 AgenticNotebook Export</h1>
+  <div class="meta">Exported ${new Date().toLocaleString()} · ${cells.length} cells</div>
+${cellsHtml}
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agentic-notebook-${Date.now()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // --- internals ------------------------------------------------------------
 
   function createBlankCell() {
@@ -225,11 +348,15 @@ Respond only to the current cell, using prior cells as background.`;
       content: '',
       output: '',
       status: 'idle',
+      previewMode: false,
       cm: null,
       cellEl: null,
       outputEl: null,
       runBtn: null,
-      labelEl: null
+      labelEl: null,
+      toggleBtn: null,
+      inputHost: null,
+      previewEl: null
     };
   }
 
@@ -269,6 +396,12 @@ Respond only to the current cell, using prior cells as background.`;
     runBtn.title = 'Run cell (Shift+Enter)';
     runBtn.addEventListener('click', () => onRunClick(cell.id));
 
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'cell-btn cell-toggle-preview';
+    toggleBtn.textContent = '👁';
+    toggleBtn.title = 'Show preview (rendered markdown)';
+    toggleBtn.addEventListener('click', () => toggleCellPreview(cell.id));
+
     const delBtn = document.createElement('button');
     delBtn.className = 'cell-btn cell-del';
     delBtn.textContent = '🗑';
@@ -276,15 +409,32 @@ Respond only to the current cell, using prior cells as background.`;
     delBtn.addEventListener('click', () => deleteCell(cell.id));
 
     toolbar.appendChild(runBtn);
+    toolbar.appendChild(toggleBtn);
     toolbar.appendChild(delBtn);
     topBar.appendChild(label);
     topBar.appendChild(toolbar);
     cellEl.appendChild(topBar);
 
-    // Input host
+    // Input host (CodeMirror lives inside)
     const inputHost = document.createElement('div');
     inputHost.className = 'cell-input';
     cellEl.appendChild(inputHost);
+
+    // Preview (rendered markdown of the input) — toggled by 👁/✏ button.
+    // Double-clicking it returns to edit mode (Jupyter-style).
+    const previewEl = document.createElement('div');
+    previewEl.className = 'cell-preview';
+    previewEl.style.display = 'none';
+    previewEl.title = 'Double-click to edit';
+    previewEl.addEventListener('dblclick', () => {
+      const live = cells.find((cc) => cc.id === cell.id);
+      if (live && live.previewMode) {
+        live.previewMode = false;
+        applyCellMode(live);
+        setTimeout(() => editor.focus(live.cm), 50);
+      }
+    });
+    cellEl.appendChild(previewEl);
 
     // Output area
     const outputEl = document.createElement('div');
@@ -297,6 +447,9 @@ Respond only to the current cell, using prior cells as background.`;
     cell.cellEl = cellEl;
     cell.outputEl = outputEl;
     cell.runBtn = runBtn;
+    cell.toggleBtn = toggleBtn;
+    cell.inputHost = inputHost;
+    cell.previewEl = previewEl;
 
     notebookEl.appendChild(cellEl);
 
@@ -311,11 +464,17 @@ Respond only to the current cell, using prior cells as background.`;
     editor.onChange(cell.cm, (value) => {
       cell.content = value;
       refreshLabel(cell);
+      if (cell.previewMode && cell.previewEl) {
+        cell.previewEl.innerHTML = renderMarkdown(value);
+      }
       saveNotebookDebounced();
     });
     editor.getWrapper(cell.cm).addEventListener('cell:shift-enter', () => {
       handleShiftEnter(cell.id);
     });
+
+    // Apply initial mode (edit by default)
+    applyCellMode(cell);
   }
 
   function rerenderAll() {
@@ -343,11 +502,13 @@ Respond only to the current cell, using prior cells as background.`;
   async function onRunClick(id) {
     const settings = await Anb.settings.load();
     await runCell(id, settings);
+    setCellPreview(id, true);
   }
 
   async function handleShiftEnter(id) {
     const settings = await Anb.settings.load();
     await runCell(id, settings);
+    setCellPreview(id, true);
 
     const idx = cells.findIndex((c) => c.id === id);
     if (idx < 0) return;
@@ -356,6 +517,48 @@ Respond only to the current cell, using prior cells as background.`;
     } else {
       addCell('below', idx);
     }
+  }
+
+  // --- preview / edit mode toggle ------------------------------------------
+
+  function applyCellMode(cell) {
+    if (!cell) return;
+    const wrapper = cell.cm ? editor.getWrapper(cell.cm) : null;
+    if (cell.previewMode) {
+      if (wrapper) wrapper.style.display = 'none';
+      if (cell.previewEl) {
+        cell.previewEl.innerHTML = renderMarkdown(cell.content || '');
+        cell.previewEl.style.display = 'block';
+      }
+      if (cell.toggleBtn) {
+        cell.toggleBtn.textContent = '✏';
+        cell.toggleBtn.title = 'Edit (back to source)';
+      }
+    } else {
+      if (cell.previewEl) cell.previewEl.style.display = 'none';
+      if (wrapper) wrapper.style.display = '';
+      if (cell.toggleBtn) {
+        cell.toggleBtn.textContent = '👁';
+        cell.toggleBtn.title = 'Show preview (rendered markdown)';
+      }
+      // CodeMirror may need a refresh after being un-hidden
+      if (cell.cm) editor.refresh(cell.cm);
+    }
+  }
+
+  function setCellPreview(id, on) {
+    const cell = cells.find((c) => c.id === id);
+    if (!cell) return;
+    if (cell.previewMode === !!on) return;
+    cell.previewMode = !!on;
+    applyCellMode(cell);
+  }
+
+  function toggleCellPreview(id) {
+    const cell = cells.find((c) => c.id === id);
+    if (!cell) return;
+    cell.previewMode = !cell.previewMode;
+    applyCellMode(cell);
   }
 
   // --- drag & drop reordering ----------------------------------------------
@@ -523,6 +726,11 @@ Respond only to the current cell, using prior cells as background.`;
     clearAllOutputs,
     runCell,
     runAll,
-    exportNotebook
+    exportNotebook,
+    exportNotebookHtml,
+    openFromFile,
+    loadNotebookData,
+    toggleCellPreview,
+    setCellPreview
   };
 })();

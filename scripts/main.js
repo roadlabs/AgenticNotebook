@@ -93,6 +93,9 @@
 
     async function handleMenuAction(action) {
       switch (action) {
+        case 'open':
+          Anb.cells.openFromFile();
+          break;
         case 'new':
           Anb.cells.newNotebook();
           break;
@@ -102,6 +105,9 @@
           break;
         case 'export':
           Anb.cells.exportNotebook();
+          break;
+        case 'export-html':
+          Anb.cells.exportNotebookHtml();
           break;
         case 'add-below':
           Anb.cells.addCell('below', Anb.cells.getCells().length - 1);
