@@ -63,7 +63,7 @@ Multi-file ES-modules vanilla web app, ~10 files, ~700 lines total. All state li
 
 - **No bundler, no ES modules.** Scripts are plain `<script>` tags loaded in dependency order (`storage → editor → llm → settings → cells → main`). Each attaches its public API to `window.Anb.<module>`. Cross-module calls use `Anb.storage.get(...)`, `Anb.llm.streamChatCompletion(...)`, etc. This is the deliberate trade-off that makes the app work from `file://` (Chrome blocks ES module loading from `file://`).
 - **No framework.** jQuery / React / Vue are not used.
-- **CDN source.** All third-party libs (CodeMirror, marked, highlight.js) come from `cdn.bootcdn.net` — same as the sibling `OnePagent` project. No npm.
+- **No CDN at runtime.** All third-party libs (CodeMirror 5.65, marked 11.1, highlight.js 11.9) are vendored under `vendor/` — committed to the repo. The app has zero network dependencies and works fully offline. (~416 KB total.)
 - **Default theme is light.** `:root` carries dark fallback; `html[data-theme="light"]` overrides for the default light palette. The `<html>` element starts with `data-theme="light"`; `main.js` falls back to `'light'` if no theme is stored. CodeMirror theme toggles between `dracula` and `default` via `cm.setOption('theme', ...)`.
 - **Code blocks stay dark in both themes.** `.cell-output pre` and `.cell-output code` use `--code-bg` / `--code-fg` variables that are NOT overridden under `html[data-theme="light"]`. This is so the github-dark hljs CSS remains readable when the page itself is light (matches GitHub's behavior).
 - **Save is debounced 500ms** on CodeMirror `change` events. Force-save via `File ▾ → Save Notebook` (used by `main.js` flash status).
