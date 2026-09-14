@@ -307,14 +307,11 @@ ${cellsHtml}
     const topBar = document.createElement('div');
     topBar.className = 'cell-topbar';
 
-    // Drag handle
+    // Drag handle (visual cue) — the whole topbar is the drag source.
     const handle = document.createElement('span');
     handle.className = 'cell-drag-handle';
     handle.textContent = '⋮⋮';
     handle.title = 'Drag to reorder';
-    handle.draggable = true;
-    handle.addEventListener('dragstart', (e) => onDragStart(e, cell.id));
-    handle.addEventListener('mousedown', (e) => e.stopPropagation());
     topBar.appendChild(handle);
 
     const label = document.createElement('span');
@@ -386,6 +383,21 @@ ${cellsHtml}
     cell.previewEl = previewEl;
 
     notebookEl.appendChild(cellEl);
+
+    // The whole topbar is the drag handle, but we abort the drag when it
+    // starts from interactive areas (toolbar buttons or the CodeMirror
+    // editor) so the user can still click ▶/👁/🗑 and select text freely.
+    topBar.draggable = true;
+    topBar.addEventListener('dragstart', (e) => {
+      if (
+        e.target.closest('.cell-toolbar') ||
+        e.target.closest('.CodeMirror')
+      ) {
+        e.preventDefault();
+        return;
+      }
+      onDragStart(e, cell.id);
+    });
 
     // Drop-target listeners on the whole cell
     cellEl.addEventListener('dragover', (e) => onDragOver(e, cell.id));

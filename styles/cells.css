@@ -32,6 +32,11 @@
   font-size: 12px;
   color: var(--text-secondary);
   min-height: 28px;
+  cursor: grab;
+}
+
+.cell-topbar:active {
+  cursor: grabbing;
 }
 
 .cell-drag-handle {
