@@ -5,24 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AgenticNotebook</title>
 
-<!-- CodeMirror 5 -->
-<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<!-- CodeMirror 5 (vendored locally — no CDN dependency) -->
+<link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
+<link rel="stylesheet" href="vendor/codemirror/theme/dracula.min.css">
 
-<!-- highlight.js (code block highlighting in rendered output) -->
-<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<!-- highlight.js (vendored locally) -->
+<link rel="stylesheet" href="vendor/highlight.js/styles/github-dark.min.css">
 
 <!-- App styles -->
 <link rel="stylesheet" href="styles/main.css">
 <link rel="stylesheet" href="styles/cells.css">
 
-<!-- CodeMirror 5 scripts -->
-<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+<!-- CodeMirror 5 scripts (vendored) -->
+<script src="vendor/codemirror/codemirror.min.js"></script>
+<script src="vendor/codemirror/mode/markdown/markdown.min.js"></script>
+<script src="vendor/codemirror/mode/xml/xml.min.js"></script>
+<script src="vendor/codemirror/mode/javascript/javascript.min.js"></script>
+<script src="vendor/codemirror/mode/css/css.min.js"></script>
 
-<!-- marked + highlight.js (must load before app modules) -->
-<script src="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<!-- marked + highlight.js (vendored) -->
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
 
 <!-- App modules — order matters: storage → editor → llm → settings → cells → main -->
 <script src="scripts/storage.js"></script>
