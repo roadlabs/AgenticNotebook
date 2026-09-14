@@ -105,12 +105,19 @@ window.Anb = window.Anb || {};
   function clearAllOutputs() {
     if (!confirm('Clear all cell outputs?')) return;
     for (const cell of cells) {
-      cell.output = '';
-      cell.status = 'idle';
-      cell.outputEl.innerHTML = '';
-      cell.cellEl.classList.remove('cell-running', 'cell-error');
-      if (cell.runBtn) cell.runBtn.disabled = false;
+      clearCellOutput(cell.id);
     }
+    saveNotebookDebounced();
+  }
+
+  function clearCellOutput(id) {
+    const cell = cells.find((c) => c.id === id);
+    if (!cell) return;
+    cell.output = '';
+    cell.status = 'idle';
+    cell.outputEl.innerHTML = '';
+    cell.cellEl.classList.remove('cell-running', 'cell-error');
+    if (cell.runBtn) cell.runBtn.disabled = false;
     saveNotebookDebounced();
   }
 
@@ -345,6 +352,12 @@ ${cellsHtml}
     runBtn.title = 'Run cell (Shift+Enter)';
     runBtn.addEventListener('click', () => onRunClick(cell.id));
 
+    const clearOutputBtn = document.createElement('button');
+    clearOutputBtn.className = 'cell-btn cell-clear-output';
+    clearOutputBtn.textContent = '🧹';
+    clearOutputBtn.title = 'Clear this cell’s output';
+    clearOutputBtn.addEventListener('click', () => clearCellOutput(cell.id));
+
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'cell-btn cell-toggle-preview';
     toggleBtn.textContent = '👁';
@@ -382,6 +395,7 @@ ${cellsHtml}
     delBtn.addEventListener('click', () => deleteCell(cell.id));
 
     toolbar.appendChild(runBtn);
+    toolbar.appendChild(clearOutputBtn);
     toolbar.appendChild(toggleBtn);
     toolbar.appendChild(moveUpBtn);
     toolbar.appendChild(moveDownBtn);
@@ -751,6 +765,7 @@ ${cellsHtml}
     deleteCell,
     moveCell,
     clearAllOutputs,
+    clearCellOutput,
     runCell,
     runAll,
     exportNotebook,
