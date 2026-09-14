@@ -6,9 +6,9 @@ window.Anb = window.Anb || {};
 
 (function () {
   const DEFAULTS = {
-    baseUrl: 'https://api.deepseek.com',
+    baseUrl: 'https://api.agnes-ai.cn/v1',
     apiKey: '',
-    model: 'deepseek-chat'
+    model: 'agnes-3.0-flash'
   };
 
   async function load() {

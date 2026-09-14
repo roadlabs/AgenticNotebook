@@ -62,7 +62,7 @@ Multi-file vanilla web app, ~10 files, ~1500 lines total. All state lives in the
   - `{ key: 'currentNotebookId', value: 'nb-xxx' }`
   - `{ key: 'theme',            value: 'dark' | 'light' }`
 - Legacy key `{ key: 'notebook', value: { cells: [...] } }` is auto-migrated on first run after upgrade to a new "Imported Notebook" entry in `notebooks`, then deleted.
-- Defaults on first run: DeepSeek base URL + `deepseek-chat` model, empty API key, light theme, one notebook named "untitle" with one empty cell.
+- Defaults on first run: Agnes base URL + `agnes-3.0-flash` model, empty API key, light theme, one notebook named "untitle" with one empty cell.
 
 ### Critical conventions
 

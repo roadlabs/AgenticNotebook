@@ -3,7 +3,7 @@
 一个**纯前端、类 Jupyter Notebook** 的页面应用，专注于 **Markdown Cell + LLM 执行**。
 每个 cell 执行时，会把该 cell 之前所有 cell 内容作为上下文，连同当前 cell 内容一同提交给 LLM API，返回结果写回当前 cell 的输出区。
 
-默认使用 DeepSeek，但 Base URL / API Key / Model 全部可改成任意 OpenAI 兼容端点（OpenAI、Moonshot、智谱、Ollama 等）。
+默认使用 Agnes，但 Base URL / API Key / Model 全部可改成任意 OpenAI 兼容端点（DeepSeek、OpenAI、Moonshot、智谱、Ollama 等）。
 
 支持**多 notebook**（在浏览器 IndexedDB 中保存多个独立笔记本）、**预览/编辑双模式**（Jupyter 风格：Shift+Enter 提交后自动渲染）、**Markdown + LaTeX 渲染**、**拖拽排序**。
 
@@ -35,9 +35,9 @@ python3 -m http.server 8765
 
 1. 打开页面后，点右上角 **⚙** 打开设置。
 2. 填入：
-   - **Base URL**：默认 `https://api.deepseek.com`
-   - **API Key**：在 [DeepSeek 开放平台](https://platform.deepseek.com/) 申请
-   - **Model**：默认 `deepseek-chat`
+   - **Base URL**：默认 `https://api.agnes-ai.cn/v1`
+   - **API Key**：在 Agnes 开放平台申请
+   - **Model**：默认 `agnes-3.0-flash`
 3. 点 **Save**。设置存到 IndexedDB。
 4. 在出现的空 cell 里写 markdown，按 **Shift+Enter** 运行，或 hover 到 cell 右上角点 **▶**。
 5. Shift+Enter 后 cell 会自动切到渲染预览模式（看到带格式的输出）。**双击预览区**可以回到源码编辑。
@@ -138,7 +138,8 @@ Please respond to Cell N.
 
 | 厂商 | Base URL | Model 例子 |
 |---|---|---|
-| DeepSeek（默认） | `https://api.deepseek.com` | `deepseek-chat` |
+| Agnes（默认） | `https://api.agnes-ai.cn/v1` | `agnes-3.0-flash` |
+| DeepSeek | `https://api.deepseek.com` | `DeepSeek-V4.1-Flash` |
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
 | Moonshot (Kimi) | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
 | 智谱 (GLM) | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` |
