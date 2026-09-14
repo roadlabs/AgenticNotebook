@@ -1,9 +1,11 @@
 # AgenticNotebook
 
 一个**纯前端、类 Jupyter Notebook** 的页面应用，专注于 **Markdown Cell + LLM 执行**。
-每个 cell 执行时，会把该 cell 之前的所有 cell 内容作为上下文，连同当前 cell 内容一同提交给 LLM API，返回结果写回当前 cell 的输出区。
+每个 cell 执行时，会把该 cell 之前所有 cell 内容作为上下文，连同当前 cell 内容一同提交给 LLM API，返回结果写回当前 cell 的输出区。
 
-默认使用 DeepSeek，但 Base URL / API Key / Model 全部可改成任意 OpenAI 兼容端点（OpenAI、Moonshot、智谱等）。
+默认使用 DeepSeek，但 Base URL / API Key / Model 全部可改成任意 OpenAI 兼容端点（OpenAI、Moonshot、智谱、Ollama 等）。
+
+支持**多 notebook**（在浏览器 IndexedDB 中保存多个独立笔记本）、**预览/编辑双模式**（Jupyter 风格：Shift+Enter 提交后自动渲染）、**Markdown + LaTeX 渲染**、**拖拽排序**。
 
 ---
 
@@ -11,8 +13,8 @@
 
 ### 方式 A：直接打开（最简单）
 
-双击 `index.html` 即可在浏览器中打开。  
-应用的所有数据（设置 + 笔记本内容）保存在浏览器的 **IndexedDB** 中。
+双击 `index.html` 即可在浏览器中打开。
+应用的所有数据（设置 + 所有 notebook）保存在浏览器的 **IndexedDB** 中。
 
 > **为什么能直接从 `file://` 跑？** 项目刻意没用 ES modules（Chrome 对 `file://` 下的 `type="module"` 脚本有 CORS 限制，会导致整个 main.js 加载失败）。改用普通 `<script>` 按依赖顺序加载，全部挂到 `window.Anb` 命名空间下，在任何浏览器 + `file://` 都能跑。
 >
@@ -38,6 +40,27 @@ python3 -m http.server 8765
    - **Model**：默认 `deepseek-chat`
 3. 点 **Save**。设置存到 IndexedDB。
 4. 在出现的空 cell 里写 markdown，按 **Shift+Enter** 运行，或 hover 到 cell 右上角点 **▶**。
+5. Shift+Enter 后 cell 会自动切到渲染预览模式（看到带格式的输出）。**双击预览区**可以回到源码编辑。
+
+---
+
+## 多 notebook
+
+顶栏里 `📓 AgenticNotebook` 旁边就是**当前 notebook 的名称**——**点击名称**可以重命名（不支持空名）。
+
+`Notebook ▾` 菜单：
+
+| 项 | 作用 |
+|---|---|
+| **New…** | 弹 prompt 输入名字 → 新建 notebook 并切过去 |
+| **Open…** | 弹模态对话框，列出所有已保存的 notebook（✓ 表示当前），点行切换，右边 🗑 删除 |
+| **Save** | 强制保存当前（防抖 500ms 自动保存之外的手动触发） |
+| **Import…** | 从 JSON 文件导入成一个新 notebook 并切过去 |
+| **Export ▸ as JSON / as HTML** | 导出当前 notebook；文件名 = `<notebook 名>-<时间戳>.{json,html}` |
+
+`Edit ▾` 菜单保留：Add Cell Below / at Top、Clear All Outputs（全局）。
+
+> **数据迁移**：旧版本（只有一个全局 notebook）升级时，IndexedDB 里旧的 `notebook` key 会自动转成一条叫 "Imported Notebook" 的记录，旧的 key 删除。无感升级。
 
 ---
 
@@ -47,24 +70,28 @@ python3 -m http.server 8765
 
 代码块（fenced code）在两种主题下都保持深色背景（与 GitHub 浅色页面的处理方式一致），保证 highlight.js 的语法高亮配色始终清晰。
 
-## 顶栏说明
+---
 
-| 按钮 | 作用 |
+## Cell 工具栏（hover 时显示）
+
+每个 cell 的顶栏在鼠标悬停时右侧会展开一排小图标按钮：
+
+| 图标 | 作用 |
 |---|---|
-| **File ▾** | New Notebook（清空 + 新建）、Save Notebook（强制保存）、Export as JSON（下载 `.json`） |
-| **Edit ▾** | Add Cell Below / at Top、Clear All Outputs |
-| **+Cell** | 在末尾追加一个 cell |
-| **▶▶ All** | 按顺序串行运行所有 cell |
-| **🧹 Clear** | 清空所有 cell 的输出 |
-| **⚙** | 打开 LLM 设置弹窗 |
-| **☀/🌙** | 切换深色 / 浅色主题 |
+| **▶** | 运行当前 cell（拼上下文 → 调 LLM → 流式写入输出区） |
+| **👁** | 切换预览/源码模式（眼睛=在源码，点变 ✏=切到预览；运行后会自动切到预览） |
+| **⏫** | 在当前 cell **上方**插入一个空白 cell 并 focus |
+| **⏬** | 在当前 cell **下方**插入一个空白 cell 并 focus |
+| **🧹** | 清空当前 cell 的输出（含 error/running 状态） |
+| **🗑** | 删除当前 cell（最后一个 cell 不能删，会弹 confirm） |
 
-### Cell 操作
+**双击预览区**可以回到源码编辑模式（Jupyter 风格）。
 
-- **▶**：运行当前 cell（拼上下文 → 调 LLM → 流式写入输出区）
-- **🗑**：删除当前 cell（最后一个 cell 不能删）
-- **Shift+Enter**（在 cell 内）：运行当前 cell，然后焦点跳到下一个 cell；若已是最后一个，自动新建一个
-- **拖拽左侧 ⋮⋮ 手柄**：调整 cell 顺序。拖到目标 cell 的上半区 → 插到它前面；下半区 → 插到它后面。被拖的 cell 会半透明，目标位置有蓝色指示线。
+### 其它操作
+
+- **Shift+Enter**（在 cell 内）：运行当前 cell，焦点跳到下一个 cell；若是最后一个，自动新建一个空 cell
+- **拖拽 cell 顶栏**（任意位置）：调整 cell 顺序。拖到目标 cell 的上半区 → 插到它前面；下半区 → 插到它后面。被拖的 cell 会半透明，目标位置有蓝色指示线
+- **点击顶栏的 notebook 名**：弹 prompt 改名
 
 ---
 
@@ -96,6 +123,12 @@ Please respond to Cell N.
 外加一行 system prompt 告诉 LLM「这是 notebook 上下文，请只针对当前 cell 回应」。
 
 > 当前 cell 之前的内容是「背景」，**不是对话历史**。重新运行 cell 1 不会「忘记」cell 2 的内容 — 它仍然在 cell 2 的输出里，只是不会作为后续 cell 的输入再发一遍（除非重新运行 cell 2）。
+
+---
+
+## 输出渲染
+
+输出区用 `marked` 解析 markdown（GFM、表格、任务列表、删除线），用 KaTeX 渲染行内 `$...$` 和块级 `$$...$$` 的 LaTeX，code block 用 highlight.js 上色（始终深色背景）。Markdown + LaTeX 同时在**输出区**和**输入预览模式**里都生效。
 
 ---
 
@@ -134,32 +167,33 @@ Please respond to Cell N.
 
 ```
 AgenticNotebook/
-├── index.html              # HTML shell，CDN 引入 CodeMirror / marked / highlight.js
+├── index.html              # HTML shell；引入所有 vendor 库 + app 脚本
 ├── styles/
-│   ├── main.css            # 顶栏、菜单、布局、主题变量
-│   └── cells.css           # cell 输入/输出/hover 工具条样式
+│   ├── main.css            # 顶栏、菜单、modal、notebook 名 slot、主题变量
+│   └── cells.css           # cell 输入/输出/hover 工具栏/预览区
 ├── scripts/
-│   ├── main.js             # 入口，组装各模块
-│   ├── cells.js            # cell 列表渲染、运行流程
-│   ├── editor.js           # CodeMirror 包装
+│   ├── main.js             # 入口，组装各模块 + 处理菜单动作
+│   ├── notebooks.js        # 多 notebook 索引（创建/切换/删除/导入/导出 JSON）
+│   ├── cells.js            # cell 列表渲染、运行、拖拽、预览切换
+│   ├── editor.js           # CodeMirror 5 包装（含 LaTeX inline overlay）
 │   ├── llm.js              # OpenAI 兼容 SSE 流式调用
-│   ├── settings.js         # 设置弹窗
+│   ├── settings.js         # LLM 设置弹窗
 │   └── storage.js          # IndexedDB 封装
+├── vendor/                 # 全部本地化（CodeMirror / marked / highlight.js / KaTeX），零 CDN 依赖
 ├── README.md
 └── CLAUDE.md
 ```
 
-无 `package.json`、无构建步骤。原生 ES modules。
+无 `package.json`、无构建步骤。原生 vanilla JS（用 `window.Anb.*` 全局命名空间组织模块，避免 file:// 下的 ES module CORS 限制）。
 
 ---
 
 ## 已知限制（v1）
 
-- 不支持代码 cell、不支持变量持久化、不支持 `.ipynb` 导入/导出。
-- 运行 cell 时如果同时增删 cell，可能出现 output 写入到旧 DOM 引用的问题（罕见）。
-- 拖拽排序后会重新渲染所有 cell，CodeMirror 焦点会丢（光标位置保留）。
-- 切换主题会保留 cell 内容（不会丢），但 CodeMirror 的焦点会丢。
-- CodeMirror 5 是经典版本，没有自动 markdown 预览（在输出区渲染）。
+- 不支持代码 cell、不支持变量持久化。
+- 运行 cell 时如果同时切换 notebook，可能出现 output 写入到旧 DOM 引用的问题（罕见，刷新页面可恢复）。
+- CodeMirror 5 是经典版本，没有原生 markdown 预览，需要用 👁 按钮手动切换（运行后会自动切）。
+- LaTeX 仅识别 `$...$` 和 `$$...$$`，不支持 `\(...\)` / `\[...\]` 等其它分隔符。
 
 ---
 
