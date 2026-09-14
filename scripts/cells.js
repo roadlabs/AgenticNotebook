@@ -206,7 +206,7 @@ Respond only to the current cell, using prior cells as background.`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `agentic-notebook-${Date.now()}.json`;
+    a.download = `${sanitizeFilename(Anb.notebooks.getName())}-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -269,7 +269,7 @@ ${cellsHtml}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `agentic-notebook-${Date.now()}.html`;
+    a.download = `${sanitizeFilename(Anb.notebooks.getName())}-${Date.now()}.html`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -646,6 +646,15 @@ ${cellsHtml}
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function sanitizeFilename(name) {
+    const cleaned = String(name == null ? '' : name)
+      .replace(/[\/\\:*?"<>|\x00-\x1f]/g, '_') // illegal on Windows / macOS
+      .replace(/^\.+/, '')                     // no leading dots (hidden files)
+      .replace(/\.+$/, '')                     // no trailing dots
+      .trim();
+    return cleaned || 'untitle';
   }
 
   // --- expose ---------------------------------------------------------------
