@@ -357,6 +357,10 @@ body {
   box-shadow: var(--shadow);
   min-width: 140px;
   z-index: 210;
+  /* Override the inherited white color from a hovered parent li
+     (.menu-items li:hover sets color: white), which would otherwise
+     make submenu items invisible on the --bg-elevated background. */
+  color: var(--text-primary);
 }
 
 .menu-item.has-submenu:hover .menu-submenu,
