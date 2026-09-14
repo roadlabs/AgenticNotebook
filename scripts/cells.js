@@ -31,7 +31,7 @@ window.Anb = window.Anb || {};
       content: c.content || '',
       output: c.output || '',
       status: 'idle',
-      previewMode: false,
+      previewMode: !!c.previewMode,
       cm: null,
       cellEl: null,
       outputEl: null,
@@ -82,6 +82,24 @@ window.Anb = window.Anb || {};
     cells.splice(idx, 1);
     rerenderAll();
     saveNotebookDebounced();
+  }
+
+  // Move a cell up (-1) or down (+1). Re-renders and refocuses the moved
+  // cell so the user can keep editing.
+  function moveCell(id, delta) {
+    const idx = cells.findIndex((c) => c.id === id);
+    if (idx < 0) return;
+    const target = idx + delta;
+    if (target < 0 || target >= cells.length) return;
+
+    [cells[idx], cells[target]] = [cells[target], cells[idx]];
+    rerenderAll();
+    saveNotebookDebounced();
+
+    const moved = cells[target];
+    if (moved && moved.cm) {
+      setTimeout(() => editor.focus(moved.cm), 50);
+    }
   }
 
   function clearAllOutputs() {
@@ -333,6 +351,30 @@ ${cellsHtml}
     toggleBtn.title = 'Show preview (rendered markdown)';
     toggleBtn.addEventListener('click', () => toggleCellPreview(cell.id));
 
+    const moveUpBtn = document.createElement('button');
+    moveUpBtn.className = 'cell-btn cell-move-up';
+    moveUpBtn.textContent = '⬆️';
+    moveUpBtn.title = 'Move cell up';
+    moveUpBtn.addEventListener('click', () => moveCell(id, -1));
+
+    const moveDownBtn = document.createElement('button');
+    moveDownBtn.className = 'cell-btn cell-move-down';
+    moveDownBtn.textContent = '⬇️';
+    moveDownBtn.title = 'Move cell down';
+    moveDownBtn.addEventListener('click', () => moveCell(id, +1));
+
+    const insertAboveBtn = document.createElement('button');
+    insertAboveBtn.className = 'cell-btn cell-insert-above';
+    insertAboveBtn.textContent = '⏫';
+    insertAboveBtn.title = 'Insert cell above';
+    insertAboveBtn.addEventListener('click', () => addCell('above', idxOf(cell.id)));
+
+    const insertBelowBtn = document.createElement('button');
+    insertBelowBtn.className = 'cell-btn cell-insert-below';
+    insertBelowBtn.textContent = '⏬';
+    insertBelowBtn.title = 'Insert cell below';
+    insertBelowBtn.addEventListener('click', () => addCell('below', idxOf(cell.id)));
+
     const delBtn = document.createElement('button');
     delBtn.className = 'cell-btn cell-del';
     delBtn.textContent = '🗑';
@@ -341,7 +383,24 @@ ${cellsHtml}
 
     toolbar.appendChild(runBtn);
     toolbar.appendChild(toggleBtn);
+    toolbar.appendChild(moveUpBtn);
+    toolbar.appendChild(moveDownBtn);
+    toolbar.appendChild(insertAboveBtn);
+    toolbar.appendChild(insertBelowBtn);
     toolbar.appendChild(delBtn);
+
+    // Disable the boundary buttons (first cell can't move up, last can't
+    // move down). Refreshed whenever the cell array is reordered.
+    function idxOf(id) {
+      return cells.findIndex((c) => c.id === id);
+    }
+    function refreshBoundaryButtons() {
+      const idx = idxOf(cell.id);
+      moveUpBtn.disabled = idx <= 0;
+      moveDownBtn.disabled = idx < 0 || idx >= cells.length - 1;
+    }
+    refreshBoundaryButtons();
+    cell.boundaryRefresh = refreshBoundaryButtons;
     topBar.appendChild(label);
     topBar.appendChild(toolbar);
     cellEl.appendChild(topBar);
@@ -427,10 +486,16 @@ ${cellsHtml}
     const dataSnapshot = cells.map((c) => ({
       id: c.id,
       content: c.content,
-      output: c.output
+      output: c.output,
+      previewMode: c.previewMode
     }));
     notebookEl.innerHTML = '';
     render(dataSnapshot);
+    // Refresh move-up/down button disabled states on every cell now that
+    // the array order has been re-derived.
+    for (const c of cells) {
+      if (typeof c.boundaryRefresh === 'function') c.boundaryRefresh();
+    }
   }
 
   function refreshLabel(cell) {
@@ -454,13 +519,20 @@ ${cellsHtml}
   async function handleShiftEnter(id) {
     const settings = await Anb.settings.load();
     await runCell(id, settings);
-    setCellPreview(id, true);
 
     const idx = cells.findIndex((c) => c.id === id);
     if (idx < 0) return;
+
     if (idx + 1 < cells.length) {
+      // Focus the next cell FIRST (while the current cell is still in
+      // edit mode, so the layout hasn't shifted), then collapse the
+      // current cell to preview. Doing it the other way around — hide
+      // the wrapper first, then focus — sometimes causes the browser
+      // to lose the focus target and scroll the page to the top.
       editor.focus(cells[idx + 1].cm);
+      setCellPreview(id, true);
     } else {
+      setCellPreview(id, true);
       addCell('below', idx);
     }
   }
@@ -677,6 +749,7 @@ ${cellsHtml}
     render,
     addCell,
     deleteCell,
+    moveCell,
     clearAllOutputs,
     runCell,
     runAll,
