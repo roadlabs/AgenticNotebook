@@ -14,7 +14,9 @@
 双击 `index.html` 即可在浏览器中打开。  
 应用的所有数据（设置 + 笔记本内容）保存在浏览器的 **IndexedDB** 中。
 
-> 大多数主流 LLM 厂商（DeepSeek / OpenAI / Moonshot / 智谱）都允许来自浏览器的 CORS 请求，所以 `file://` 协议下也能正常调用 API。
+> **为什么能直接从 `file://` 跑？** 项目刻意没用 ES modules（Chrome 对 `file://` 下的 `type="module"` 脚本有 CORS 限制，会导致整个 main.js 加载失败）。改用普通 `<script>` 按依赖顺序加载，全部挂到 `window.Anb` 命名空间下，在任何浏览器 + `file://` 都能跑。
+>
+> 大多数主流 LLM 厂商（DeepSeek / OpenAI / Moonshot / 智谱）都允许来自浏览器的 CORS 请求，所以 `file://` 协议下 API 调用也基本可用。
 
 ### 方式 B：本地 HTTP server（如果方式 A 遇到 CORS 报错）
 
@@ -38,6 +40,12 @@ python3 -m http.server 8765
 4. 在出现的空 cell 里写 markdown，按 **Shift+Enter** 运行，或 hover 到 cell 右上角点 **▶**。
 
 ---
+
+## 主题
+
+默认浅色。点右上角 **☀/🌙** 切换深色 / 浅色。选择会持久化到 IndexedDB。
+
+代码块（fenced code）在两种主题下都保持深色背景（与 GitHub 浅色页面的处理方式一致），保证 highlight.js 的语法高亮配色始终清晰。
 
 ## 顶栏说明
 

@@ -40,15 +40,15 @@ Multi-file ES-modules vanilla web app, ~10 files, ~700 lines total. All state li
 
 | File | Responsibility | Talks to |
 |---|---|---|
-| `index.html` | HTML shell, CDN script tags (CodeMirror 5, marked 11, highlight.js 11) | — |
-| `styles/main.css` | Layout, top bar, menus, modal, theme variables (CSS custom props) | — |
-| `styles/cells.css` | Cell visual treatment, CodeMirror tweaks, output markdown typography | — |
-| `scripts/main.js` | Entry. Wires top-bar buttons, menu actions, theme toggle, click-outside-to-close menus | storage, settings, cells, editor |
-| `scripts/cells.js` | Cell list state, render/delete/add/clear, run flow (builds messages, calls `llm.streamChatCompletion`), drag-and-drop reordering (HTML5 DnD via the `⋮⋮` handle), markdown render of output | editor, llm |
+| `index.html` | HTML shell, CDN script tags (CodeMirror 5, marked 11, highlight.js 11) + app scripts loaded in dependency order | — |
+| `styles/main.css` | Layout, top bar, menus, modal, theme variables (CSS custom props, light default) | — |
+| `styles/cells.css` | Cell visual treatment, CodeMirror tweaks, output markdown typography (code blocks stay dark in both themes) | — |
+| `scripts/main.js` | Entry. Wires top-bar buttons, menu actions, theme toggle, click-outside-to-close menus | storage, settings, cells, editor (via `window.Anb.*`) |
+| `scripts/cells.js` | Cell list state, render/delete/add/clear, run flow (builds messages, calls `Anb.llm.streamChatCompletion`), drag-and-drop reordering (HTML5 DnD via the `⋮⋮` handle), markdown render of output | Anb.editor, Anb.llm |
 | `scripts/editor.js` | Thin CodeMirror 5 wrapper: `createEditor`, `getValue`, `setValue`, `focus`, `setTheme`, `onChange`. Shift+Enter is captured and emitted as a `cell:shift-enter` CustomEvent on the wrapper | CodeMirror (global) |
 | `scripts/llm.js` | `streamChatCompletion({ baseUrl, apiKey, model, messages, onChunk, onDone, onError, signal })`. OpenAI-compatible SSE parser, error handling (HTTP status + JSON error body + network), `[DONE]` sentinel, `data: ` line splitting | fetch (browser native) |
-| `scripts/settings.js` | LLM settings modal (Base URL / API Key / Model), pre-fills from storage, saves on submit | storage |
-| `scripts/storage.js` | IndexedDB wrapper around `agentic_notebook` DB, `kv` store. Exports `init / get / set / del` as Promises | indexedDB (browser native) |
+| `scripts/settings.js` | LLM settings modal (Base URL / API Key / Model), pre-fills from storage, saves on submit | Anb.storage |
+| `scripts/storage.js` | IndexedDB wrapper around `agentic_notebook` DB, `kv` store. Exposes `init / get / set / del` as Promises on `Anb.storage` | indexedDB (browser native) |
 
 ### Storage schema (IndexedDB)
 
@@ -61,10 +61,11 @@ Multi-file ES-modules vanilla web app, ~10 files, ~700 lines total. All state li
 
 ### Critical conventions
 
-- **No bundler.** All imports use relative paths with `.js` extension (required for browser-native ES modules).
+- **No bundler, no ES modules.** Scripts are plain `<script>` tags loaded in dependency order (`storage → editor → llm → settings → cells → main`). Each attaches its public API to `window.Anb.<module>`. Cross-module calls use `Anb.storage.get(...)`, `Anb.llm.streamChatCompletion(...)`, etc. This is the deliberate trade-off that makes the app work from `file://` (Chrome blocks ES module loading from `file://`).
 - **No framework.** jQuery / React / Vue are not used.
 - **CDN source.** All third-party libs (CodeMirror, marked, highlight.js) come from `cdn.bootcdn.net` — same as the sibling `OnePagent` project. No npm.
-- **Default theme is dark.** CSS variables on `:root` define the palette; `html[data-theme="light"]` overrides for light mode. CodeMirror theme toggles between `dracula` and `default` via `cm.setOption('theme', ...)`.
+- **Default theme is light.** `:root` carries dark fallback; `html[data-theme="light"]` overrides for the default light palette. The `<html>` element starts with `data-theme="light"`; `main.js` falls back to `'light'` if no theme is stored. CodeMirror theme toggles between `dracula` and `default` via `cm.setOption('theme', ...)`.
+- **Code blocks stay dark in both themes.** `.cell-output pre` and `.cell-output code` use `--code-bg` / `--code-fg` variables that are NOT overridden under `html[data-theme="light"]`. This is so the github-dark hljs CSS remains readable when the page itself is light (matches GitHub's behavior).
 - **Save is debounced 500ms** on CodeMirror `change` events. Force-save via `File ▾ → Save Notebook` (used by `main.js` flash status).
 - **Cell Run uses dynamic element lookup** (`cells.find(c => c.id === id).outputEl`) inside streaming callbacks so that a re-render mid-stream doesn't lose output.
 - **Shift+Enter propagation**: `editor.js` emits a bubbling `cell:shift-enter` CustomEvent; `cells.js` listens on the wrapper element and runs `handleShiftEnter`.

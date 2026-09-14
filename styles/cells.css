@@ -210,7 +210,8 @@
 .cell-output li { margin: 2px 0; }
 
 .cell-output code {
-  background: var(--bg-cell);
+  background: var(--code-bg);
+  color: var(--code-fg);
   padding: 2px 6px;
   border-radius: 3px;
   font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
@@ -219,7 +220,8 @@
 }
 
 .cell-output pre {
-  background: var(--bg-cell);
+  background: var(--code-bg);
+  color: var(--code-fg);
   padding: 12px 14px;
   border-radius: 4px;
   overflow-x: auto;

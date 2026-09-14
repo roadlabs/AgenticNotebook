@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,9 +20,17 @@
 <script src="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
 
-<!-- marked + highlight.js (must load before modules) -->
+<!-- marked + highlight.js (must load before app modules) -->
 <script src="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js"></script>
 <script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<!-- App modules — order matters: storage → editor → llm → settings → cells → main -->
+<script src="scripts/storage.js"></script>
+<script src="scripts/editor.js"></script>
+<script src="scripts/llm.js"></script>
+<script src="scripts/settings.js"></script>
+<script src="scripts/cells.js"></script>
+<script src="scripts/main.js"></script>
 </head>
 <body>
 
@@ -85,6 +93,9 @@
   </div>
 </div>
 
-<script type="module" src="scripts/main.js"></script>
+<script>
+  // Fallback for old / no-defer browsers: main.js already calls main() on its own
+  // via an IIFE at the bottom of that file. Nothing to do here.
+</script>
 </body>
 </html>

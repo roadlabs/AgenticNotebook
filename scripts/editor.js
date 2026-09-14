@@ -1,69 +1,82 @@
 // ============================================================
-// editor.js — Thin wrapper around CodeMirror 5 (markdown mode)
+// editor.js — CodeMirror 5 wrapper (attaches to window.Anb.editor)
 // ============================================================
 
-const CM_THEME_DARK = 'dracula';
-const CM_THEME_LIGHT = 'default';
+window.Anb = window.Anb || {};
 
-export function getCurrentCMTheme() {
-  return document.documentElement.dataset.theme === 'light' ? CM_THEME_LIGHT : CM_THEME_DARK;
-}
+(function () {
+  const CM_THEME_DARK = 'dracula';
+  const CM_THEME_LIGHT = 'default';
 
-export function createEditor(parent, initialValue = '') {
-  const cm = CodeMirror(parent, {
-    value: initialValue,
-    mode: 'markdown',
-    theme: getCurrentCMTheme(),
-    lineNumbers: true,
-    lineWrapping: true,
-    indentUnit: 2,
-    tabSize: 2,
-    extraKeys: {
-      // Shift+Enter: emit a custom event the cells module handles.
-      // We use a custom DOM event so the editor's Shift+Enter doesn't
-      // get intercepted by browser / CodeMirror defaults (which would
-      // insert a newline). Bubbling: yes, so cells.js can listen.
-      'Shift-Enter': (cm) => {
-        const evt = new CustomEvent('cell:shift-enter', { bubbles: true });
-        cm.getWrapperElement().dispatchEvent(evt);
-      }
-    }
-  });
-
-  return cm;
-}
-
-export function getValue(cm) {
-  return cm.getValue();
-}
-
-export function setValue(cm, value) {
-  cm.setValue(value);
-}
-
-export function focus(cm) {
-  // refresh first to ensure proper sizing if recently hidden
-  if (cm.getWrapperElement().offsetParent !== null) {
-    cm.focus();
-  } else {
-    setTimeout(() => cm.focus(), 50);
+  function getCurrentCMTheme() {
+    return document.documentElement.dataset.theme === 'light' ? CM_THEME_LIGHT : CM_THEME_DARK;
   }
-}
 
-export function setTheme(cm, theme) {
-  cm.setOption('theme', theme);
-}
+  function createEditor(parent, initialValue = '') {
+    const cm = CodeMirror(parent, {
+      value: initialValue,
+      mode: 'markdown',
+      theme: getCurrentCMTheme(),
+      lineNumbers: true,
+      lineWrapping: true,
+      indentUnit: 2,
+      tabSize: 2,
+      extraKeys: {
+        // Shift+Enter: emit a custom bubbling event the cells module handles.
+        // We use a custom DOM event so Shift+Enter doesn't just insert a newline.
+        'Shift-Enter': (cm) => {
+          const evt = new CustomEvent('cell:shift-enter', { bubbles: true });
+          cm.getWrapperElement().dispatchEvent(evt);
+        }
+      }
+    });
 
-export function refresh(cm) {
-  cm.refresh();
-}
+    return cm;
+  }
 
-export function onChange(cm, handler) {
-  cm.on('change', (instance) => {
-    handler(instance.getValue());
-  });
-}
+  function getValue(cm) {
+    return cm.getValue();
+  }
 
-export function getWrapper(cm) {
-  return cm.getWrapperElement();
-}
+  function setValue(cm, value) {
+    cm.setValue(value);
+  }
+
+  function focus(cm) {
+    if (cm.getWrapperElement().offsetParent !== null) {
+      cm.focus();
+    } else {
+      setTimeout(() => cm.focus(), 50);
+    }
+  }
+
+  function setTheme(cm, theme) {
+    cm.setOption('theme', theme);
+  }
+
+  function refresh(cm) {
+    cm.refresh();
+  }
+
+  function onChange(cm, handler) {
+    cm.on('change', (instance) => {
+      handler(instance.getValue());
+    });
+  }
+
+  function getWrapper(cm) {
+    return cm.getWrapperElement();
+  }
+
+  window.Anb.editor = {
+    getCurrentCMTheme,
+    createEditor,
+    getValue,
+    setValue,
+    focus,
+    setTheme,
+    refresh,
+    onChange,
+    getWrapper
+  };
+})();

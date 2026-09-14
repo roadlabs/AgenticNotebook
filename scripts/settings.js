@@ -1,73 +1,74 @@
 // ============================================================
-// settings.js — LLM settings modal (Base URL / API Key / Model)
-// Persists to IndexedDB via storage.js
+// settings.js — LLM settings modal (attaches to window.Anb.settings)
 // ============================================================
 
-import * as storage from './storage.js';
+window.Anb = window.Anb || {};
 
-const DEFAULTS = {
-  baseUrl: 'https://api.deepseek.com',
-  apiKey: '',
-  model: 'deepseek-chat'
-};
+(function () {
+  const DEFAULTS = {
+    baseUrl: 'https://api.deepseek.com',
+    apiKey: '',
+    model: 'deepseek-chat'
+  };
 
-export async function load() {
-  const s = await storage.get('settings');
-  return s ? { ...DEFAULTS, ...s } : { ...DEFAULTS };
-}
-
-export async function save(settings) {
-  await storage.set('settings', settings);
-}
-
-export function setupModal({ onSave } = {}) {
-  const modal = document.getElementById('settings-modal');
-  const form = document.getElementById('settings-form');
-  const baseUrlInput = document.getElementById('cfg-base-url');
-  const apiKeyInput = document.getElementById('cfg-api-key');
-  const modelInput = document.getElementById('cfg-model');
-  const cancelBtn = document.getElementById('cfg-cancel');
-  const settingsBtn = document.getElementById('btn-settings');
-
-  async function open() {
-    const s = await load();
-    baseUrlInput.value = s.baseUrl;
-    apiKeyInput.value = s.apiKey;
-    modelInput.value = s.model;
-    modal.classList.remove('hidden');
-    setTimeout(() => baseUrlInput.focus(), 50);
+  async function load() {
+    const s = await window.Anb.storage.get('settings');
+    return s ? { ...DEFAULTS, ...s } : { ...DEFAULTS };
   }
 
-  function close() {
-    modal.classList.add('hidden');
+  async function save(settings) {
+    await window.Anb.storage.set('settings', settings);
   }
 
-  settingsBtn.addEventListener('click', open);
-  cancelBtn.addEventListener('click', close);
+  function setupModal({ onSave } = {}) {
+    const modal = document.getElementById('settings-modal');
+    const form = document.getElementById('settings-form');
+    const baseUrlInput = document.getElementById('cfg-base-url');
+    const apiKeyInput = document.getElementById('cfg-api-key');
+    const modelInput = document.getElementById('cfg-model');
+    const cancelBtn = document.getElementById('cfg-cancel');
+    const settingsBtn = document.getElementById('btn-settings');
 
-  // Click backdrop to close
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) close();
-  });
-
-  // Esc to close
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-      close();
+    async function open() {
+      const s = await load();
+      baseUrlInput.value = s.baseUrl;
+      apiKeyInput.value = s.apiKey;
+      modelInput.value = s.model;
+      modal.classList.remove('hidden');
+      setTimeout(() => baseUrlInput.focus(), 50);
     }
-  });
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const settings = {
-      baseUrl: baseUrlInput.value.trim(),
-      apiKey: apiKeyInput.value.trim(),
-      model: modelInput.value.trim()
-    };
-    await save(settings);
-    if (typeof onSave === 'function') onSave(settings);
-    close();
-  });
+    function close() {
+      modal.classList.add('hidden');
+    }
 
-  return { open, close };
-}
+    settingsBtn.addEventListener('click', open);
+    cancelBtn.addEventListener('click', close);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+        close();
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const settings = {
+        baseUrl: baseUrlInput.value.trim(),
+        apiKey: apiKeyInput.value.trim(),
+        model: modelInput.value.trim()
+      };
+      await save(settings);
+      if (typeof onSave === 'function') onSave(settings);
+      close();
+    });
+
+    return { open, close };
+  }
+
+  window.Anb.settings = { load, save, setupModal };
+})();
