@@ -246,6 +246,23 @@
   border-radius: 0 4px 4px 0;
 }
 
+/* KaTeX display math: render with margin + horizontal scrollbar if too wide */
+.cell-output .katex-display {
+  margin: 12px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+/* KaTeX inline math: keep on the same line, prevent line-break inside */
+.cell-output .katex {
+  font-size: 1.05em;
+  white-space: nowrap;
+}
+
+/* If the paragraph is otherwise empty (just inline math), don't add extra margin */
+.cell-output p:empty { display: none; }
+
 .cell-output a {
   color: var(--accent);
   text-decoration: none;

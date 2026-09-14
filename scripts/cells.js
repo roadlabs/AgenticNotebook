@@ -469,7 +469,32 @@ Respond only to the current cell, using prior cells as background.`;
             return escapeHtml(code);
           }
         });
-        return marked.parse(text);
+
+        let html = marked.parse(text);
+
+        // KaTeX auto-render: walk the parsed HTML, find $...$ / $$...$$ in
+        // text nodes, and replace with rendered math. Skips <code>/<pre>
+        // automatically so inline code with literal `$` stays untouched.
+        if (typeof window.renderMathInElement === 'function') {
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = html;
+          try {
+            window.renderMathInElement(wrapper, {
+              delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '$',  right: '$',  display: false }
+              ],
+              throwOnError: false,
+              // Don't double-render math that's already been KaTeX-processed
+              ignoredClasses: ['katex']
+            });
+            html = wrapper.innerHTML;
+          } catch (err) {
+            console.warn('KaTeX render failed:', err);
+          }
+        }
+
+        return html;
       }
     } catch (err) {
       console.warn('marked parse failed:', err);

@@ -9,6 +9,9 @@
 <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
 <link rel="stylesheet" href="vendor/codemirror/theme/dracula.min.css">
 
+<!-- KaTeX (math rendering in output) -->
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+
 <!-- highlight.js (vendored locally) -->
 <link rel="stylesheet" href="vendor/highlight.js/styles/github-dark.min.css">
 
@@ -22,10 +25,15 @@
 <script src="vendor/codemirror/mode/xml/xml.min.js"></script>
 <script src="vendor/codemirror/mode/javascript/javascript.min.js"></script>
 <script src="vendor/codemirror/mode/css/css.min.js"></script>
+<script src="vendor/codemirror/addon/mode/overlay.js"></script>
 
 <!-- marked + highlight.js (vendored) -->
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/highlight.min.js"></script>
+
+<!-- KaTeX (math rendering) -->
+<script src="vendor/katex/katex.min.js"></script>
+<script src="vendor/katex/auto-render.min.js"></script>
 
 <!-- App modules — order matters: storage → editor → llm → settings → cells → main -->
 <script src="scripts/storage.js"></script>
