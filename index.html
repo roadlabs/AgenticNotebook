@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgenticNotebook</title>
+
+<!-- CodeMirror 5 -->
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+
+<!-- highlight.js (code block highlighting in rendered output) -->
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+
+<!-- App styles -->
+<link rel="stylesheet" href="styles/main.css">
+<link rel="stylesheet" href="styles/cells.css">
+
+<!-- CodeMirror 5 scripts -->
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+
+<!-- marked + highlight.js (must load before modules) -->
+<script src="https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">📓 AgenticNotebook</div>
+
+  <div class="menubar">
+    <details class="menu">
+      <summary>File</summary>
+      <ul class="menu-items">
+        <li data-action="new">New Notebook</li>
+        <li data-action="save">Save Notebook</li>
+        <li data-action="export">Export as JSON</li>
+      </ul>
+    </details>
+    <details class="menu">
+      <summary>Edit</summary>
+      <ul class="menu-items">
+        <li data-action="add-below">Add Cell Below</li>
+        <li data-action="add-above">Add Cell at Top</li>
+        <li data-action="clear-outputs">Clear All Outputs</li>
+      </ul>
+    </details>
+  </div>
+
+  <div class="toolbar">
+    <button id="btn-add-cell" title="Add cell">+Cell</button>
+    <button id="btn-run-all" title="Run all cells in order">▶▶ All</button>
+    <button id="btn-clear" title="Clear all outputs">🧹 Clear</button>
+    <button id="btn-settings" title="LLM settings">⚙</button>
+    <button id="btn-theme" title="Toggle theme">☀</button>
+  </div>
+</header>
+
+<main id="notebook"></main>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="modal hidden" role="dialog" aria-labelledby="settings-title">
+  <div class="modal-content">
+    <h2 id="settings-title">⚙ LLM Settings</h2>
+    <form id="settings-form">
+      <label>
+        <span>Base URL</span>
+        <input type="text" id="cfg-base-url" placeholder="https://api.deepseek.com" autocomplete="off" required>
+      </label>
+      <label>
+        <span>API Key</span>
+        <input type="password" id="cfg-api-key" placeholder="sk-..." autocomplete="off" required>
+      </label>
+      <label>
+        <span>Model</span>
+        <input type="text" id="cfg-model" placeholder="deepseek-chat" autocomplete="off" required>
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="cfg-cancel">Cancel</button>
+        <button type="submit" id="cfg-save">Save</button>
+      </div>
+    </form>
+    <p class="modal-hint">Defaults are DeepSeek. Any OpenAI-compatible endpoint works.</p>
+  </div>
+</div>
+
+<script type="module" src="scripts/main.js"></script>
+</body>
+</html>
