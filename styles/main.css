@@ -294,6 +294,194 @@ body {
   line-height: 1.4;
 }
 
+/* ---------- Inline current-notebook slot in topbar ---------- */
+.notebook-slot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  margin-left: 4px;
+  height: 36px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.notebook-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.notebook-name:hover {
+  background: var(--bg-root);
+  color: var(--accent);
+}
+
+.icon-btn-sm {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+/* ---------- Menu submenu (Export ▸) ---------- */
+.menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+  list-style: none;
+  padding: 0;
+  pointer-events: none;
+}
+
+.menu-item.has-submenu {
+  position: relative;
+}
+
+.menu-item.has-submenu > .menu-item-label {
+  display: block;
+  width: 100%;
+}
+
+.menu-submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+  min-width: 140px;
+  z-index: 210;
+}
+
+.menu-item.has-submenu:hover .menu-submenu,
+.menu-item.has-submenu:focus-within .menu-submenu {
+  display: block;
+}
+
+.menu-submenu li {
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  user-select: none;
+}
+
+.menu-submenu li:hover {
+  background: var(--accent);
+  color: white;
+}
+
+/* ---------- Open Notebook modal ---------- */
+#open-modal .modal-content {
+  width: min(580px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.notebook-list {
+  flex: 1;
+  overflow-y: auto;
+  margin: 8px 0 16px;
+  min-height: 80px;
+}
+
+.notebook-empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.notebook-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: var(--bg-cell);
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.notebook-row:hover {
+  background: var(--bg-root);
+  border-color: var(--border-strong);
+}
+
+.notebook-row.current {
+  border-color: var(--accent);
+  background: rgba(74, 158, 255, 0.10);
+}
+
+.notebook-row-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.notebook-row-check {
+  width: 16px;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.notebook-row-name {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.notebook-row-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.notebook-row-delete {
+  flex-shrink: 0;
+  width: 30px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notebook-row-delete:hover {
+  background: var(--error);
+  color: white;
+  border-color: var(--error);
+}
+
 /* ---------- Scrollbar (subtle) ---------- */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }

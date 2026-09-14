@@ -35,11 +35,12 @@
 <script src="vendor/katex/katex.min.js"></script>
 <script src="vendor/katex/auto-render.min.js"></script>
 
-<!-- App modules — order matters: storage → editor → llm → settings → cells → main -->
+<!-- App modules — order matters: storage → editor → llm → settings → notebooks → cells → main -->
 <script src="scripts/storage.js"></script>
 <script src="scripts/editor.js"></script>
 <script src="scripts/llm.js"></script>
 <script src="scripts/settings.js"></script>
+<script src="scripts/notebooks.js"></script>
 <script src="scripts/cells.js"></script>
 <script src="scripts/main.js"></script>
 </head>
@@ -48,15 +49,28 @@
 <header class="topbar">
   <div class="brand">📓 AgenticNotebook</div>
 
+  <div class="notebook-slot" title="Click to rename">
+    <span class="notebook-name" id="current-notebook-name">📓 Untitled</span>
+    <button class="icon-btn icon-btn-sm notebook-rename" id="btn-rename-notebook" title="Rename notebook" aria-label="Rename notebook">✏️</button>
+  </div>
+
   <div class="menubar">
     <details class="menu">
-      <summary>File</summary>
+      <summary>Notebook</summary>
       <ul class="menu-items">
-        <li data-action="open">Open Notebook…</li>
-        <li data-action="new">New Notebook</li>
-        <li data-action="save">Save Notebook</li>
-        <li data-action="export">Export as JSON</li>
-        <li data-action="export-html">Export as HTML</li>
+        <li data-action="new-notebook">New Notebook…</li>
+        <li data-action="open-notebook">Open Notebook…</li>
+        <li data-action="save-notebook">Save Notebook</li>
+        <li data-action="rename-notebook">Rename Notebook…</li>
+        <li class="menu-separator"></li>
+        <li data-action="import-notebook">Import from JSON…</li>
+        <li class="menu-item has-submenu">
+          <span class="menu-item-label">Export ▸</span>
+          <ul class="menu-submenu">
+            <li data-action="export-json">as JSON</li>
+            <li data-action="export-html">as HTML</li>
+          </ul>
+        </li>
       </ul>
     </details>
     <details class="menu">
@@ -79,6 +93,17 @@
 </header>
 
 <main id="notebook"></main>
+
+<!-- Open Notebook modal -->
+<div id="open-modal" class="modal hidden" role="dialog" aria-labelledby="open-title">
+  <div class="modal-content">
+    <h2 id="open-title">📂 Open Notebook</h2>
+    <div class="notebook-list" id="open-notebook-list"></div>
+    <div class="modal-actions">
+      <button type="button" id="open-cancel">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- Settings modal -->
 <div id="settings-modal" class="modal hidden" role="dialog" aria-labelledby="settings-title">

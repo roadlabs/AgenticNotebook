@@ -53,16 +53,6 @@ window.Anb = window.Anb || {};
     refreshAllLabels();
   }
 
-  function newNotebook() {
-    if (cells.length > 0 && !confirm('Discard current notebook and start fresh?')) return;
-    cells = [createBlankCell()];
-    notebookEl.innerHTML = '';
-    renderCell(cells[0]);
-    refreshAllLabels();
-    saveNotebookDebounced();
-    setTimeout(() => editor.focus(cells[0].cm), 50);
-  }
-
   function addCell(position = 'below', atIndex = -1) {
     const newCell = createBlankCell();
     let insertAt;
@@ -219,62 +209,6 @@ Respond only to the current cell, using prior cells as background.`;
     a.download = `agentic-notebook-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }
-
-  function openFromFile() {
-    const hasContent = cells.some((c) => c.content.trim() || c.output.trim());
-    if (hasContent && !confirm('Replace current notebook with the one from file?')) return;
-
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,application/json';
-    input.addEventListener('change', () => {
-      const file = input.files && input.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const data = JSON.parse(reader.result);
-          const ok = loadNotebookData(data);
-          if (!ok) alert('Invalid notebook file: missing or malformed "cells" array.');
-        } catch (err) {
-          alert('Failed to parse JSON: ' + err.message);
-        }
-      };
-      reader.onerror = () => alert('Failed to read file.');
-      reader.readAsText(file);
-    });
-    input.click();
-  }
-
-  function loadNotebookData(data) {
-    if (!data || !Array.isArray(data.cells)) return false;
-    const valid = data.cells.every(
-      (c) =>
-        c &&
-        typeof c === 'object' &&
-        typeof c.id === 'string' &&
-        typeof c.content === 'string' &&
-        typeof c.output === 'string'
-    );
-    if (!valid) return false;
-
-    const cellsData = data.cells.map((c) => ({
-      id: c.id,
-      content: c.content,
-      output: c.output
-    }));
-    if (cellsData.length === 0) {
-      cellsData.push({ id: newId(), content: '', output: '' });
-    }
-    render(cellsData);
-    saveNotebookDebounced();
-
-    const first = getCells()[0];
-    if (first && first.cm) {
-      setTimeout(() => editor.focus(first.cm), 50);
-    }
-    return true;
   }
 
   function exportNotebookHtml() {
@@ -720,7 +654,6 @@ ${cellsHtml}
     init,
     getCells,
     render,
-    newNotebook,
     addCell,
     deleteCell,
     clearAllOutputs,
@@ -728,8 +661,6 @@ ${cellsHtml}
     runAll,
     exportNotebook,
     exportNotebookHtml,
-    openFromFile,
-    loadNotebookData,
     toggleCellPreview,
     setCellPreview
   };

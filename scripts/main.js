@@ -1,56 +1,52 @@
 // ============================================================
-// main.js — Entry point. Wires top bar, settings, cells.
+// main.js — Entry point. Wires top bar, settings, cells, notebooks.
 // (No ES modules; attaches to window.Anb)
 // ============================================================
 
 (function () {
   const Anb = window.Anb;
 
-  const DEFAULT_NOTEBOOK = () => [
-    { id: `c-${Date.now().toString(36)}`, content: '', output: '' }
-  ];
-
   let saveTimer = null;
+  let savePending = false; // cells changed since last save
 
   function debouncedSaveNotebook() {
+    savePending = true;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(saveNotebook, 500);
   }
 
   async function saveNotebook() {
     saveTimer = null;
+    savePending = false;
     const data = Anb.cells.getCells().map((c) => ({
       id: c.id,
       content: c.content,
       output: c.output
     }));
     try {
-      await Anb.storage.set('notebook', { cells: data });
+      await Anb.notebooks.setCurrentCells(data);
     } catch (err) {
       console.error('Failed to save notebook:', err);
     }
   }
 
-  async function loadNotebook() {
-    const n = await Anb.storage.get('notebook');
-    if (n && Array.isArray(n.cells) && n.cells.length > 0) return n.cells;
-    return DEFAULT_NOTEBOOK();
-  }
-
   async function main() {
-    // 1. Init IndexedDB
+    // 1. Init storage + notebooks (handles legacy → "Imported Notebook" migration)
     await Anb.storage.init();
+    await Anb.notebooks.init({
+      onChange: () => updateNotebookSlot()
+    });
 
     // 2. Init cells module (wires save callback)
     Anb.cells.init(document.getElementById('notebook'), debouncedSaveNotebook);
 
-    // 3. Load theme (before rendering cells, so CodeMirror picks correct theme)
+    // 3. Load theme
     const savedTheme = await Anb.storage.get('theme');
     applyTheme(savedTheme || 'light');
 
-    // 4. Load & render notebook
-    const cellsData = await loadNotebook();
-    Anb.cells.render(cellsData);
+    // 4. Load & render the current notebook
+    Anb.cells.render(Anb.notebooks.getCurrentCells());
+    updateNotebookSlot();
 
     // 5. Settings modal
     Anb.settings.setupModal({
@@ -81,9 +77,24 @@
       }
     });
 
+    // Inline rename: click name or ✏ button
+    document.getElementById('current-notebook-name').addEventListener('click', renameCurrentNotebook);
+    document.getElementById('btn-rename-notebook').addEventListener('click', renameCurrentNotebook);
+
     // 7. Menu actions
-    document.querySelectorAll('.menu-items li').forEach((li) => {
-      li.addEventListener('click', async () => {
+    document.querySelectorAll('.menu-items > li[data-action]').forEach((li) => {
+      li.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const action = li.dataset.action;
+        const details = li.closest('details');
+        if (details) details.removeAttribute('open');
+        await handleMenuAction(action);
+      });
+    });
+    // Submenu items (Export ▸)
+    document.querySelectorAll('.menu-submenu > li[data-action]').forEach((li) => {
+      li.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const action = li.dataset.action;
         const details = li.closest('details');
         if (details) details.removeAttribute('open');
@@ -93,21 +104,29 @@
 
     async function handleMenuAction(action) {
       switch (action) {
-        case 'open':
-          Anb.cells.openFromFile();
+        case 'new-notebook':
+          await actionNewNotebook();
           break;
-        case 'new':
-          Anb.cells.newNotebook();
+        case 'open-notebook':
+          await actionOpenNotebook();
           break;
-        case 'save':
+        case 'save-notebook':
           await saveNotebook();
-          flashStatus('Notebook saved.');
+          flashStatus(savePending ? 'Nothing to save.' : 'Notebook saved.');
           break;
-        case 'export':
+        case 'rename-notebook':
+          await renameCurrentNotebook();
+          break;
+        case 'import-notebook':
+          await actionImportFromJson();
+          break;
+        case 'export-json':
           Anb.cells.exportNotebook();
+          flashStatus('Exported as JSON.');
           break;
         case 'export-html':
           Anb.cells.exportNotebookHtml();
+          flashStatus('Exported as HTML.');
           break;
         case 'add-below':
           Anb.cells.addCell('below', Anb.cells.getCells().length - 1);
@@ -123,19 +142,196 @@
       }
     }
 
-    // 8. Click-outside closes any open <details> menus
+    // 8. Open modal close
+    document.getElementById('open-cancel').addEventListener('click', hideOpenModal);
+    document.getElementById('open-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'open-modal') hideOpenModal();
+    });
+
+    // 9. Click-outside closes any open <details> menus
     document.addEventListener('click', (e) => {
       document.querySelectorAll('details.menu[open]').forEach((d) => {
         if (!d.contains(e.target)) d.removeAttribute('open');
       });
     });
 
-    // 9. Focus the first cell on load
+    // 10. Focus the first cell on load
     const firstCell = Anb.cells.getCells()[0];
     if (firstCell && firstCell.cm) {
       setTimeout(() => Anb.editor.focus(firstCell.cm), 150);
     }
   }
+
+  // --- notebook actions ----------------------------------------------------
+
+  async function actionNewNotebook() {
+    // Flush any pending changes for the current notebook first
+    await saveNotebook();
+    const name = window.prompt('Name for the new notebook:', 'Untitled Notebook');
+    if (name === null) return;
+    await Anb.notebooks.createNew(name.trim() || 'Untitled Notebook');
+    Anb.cells.render(Anb.notebooks.getCurrentCells());
+    const first = Anb.cells.getCells()[0];
+    if (first && first.cm) setTimeout(() => Anb.editor.focus(first.cm), 50);
+    flashStatus('New notebook created.');
+  }
+
+  async function actionOpenNotebook() {
+    // Flush pending changes first
+    await saveNotebook();
+    showOpenModal();
+  }
+
+  async function actionImportFromJson() {
+    const hasContent = Anb.cells.getCells().some((c) => c.content.trim() || c.output.trim());
+    if (hasContent && !confirm('Import will replace the current notebook. Continue?')) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const data = JSON.parse(reader.result);
+          const id = await Anb.notebooks.importFromData(
+            data,
+            `Imported ${new Date().toLocaleString()}`
+          );
+          if (!id) {
+            alert('Invalid notebook file: missing or malformed "cells" array.');
+            return;
+          }
+          Anb.cells.render(Anb.notebooks.getCurrentCells());
+          const first = Anb.cells.getCells()[0];
+          if (first && first.cm) setTimeout(() => Anb.editor.focus(first.cm), 50);
+          flashStatus('Notebook imported.');
+        } catch (err) {
+          alert('Failed to parse JSON: ' + err.message);
+        }
+      };
+      reader.onerror = () => alert('Failed to read file.');
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  async function renameCurrentNotebook() {
+    const current = Anb.notebooks.getCurrent();
+    if (!current) return;
+    const next = window.prompt('Rename notebook:', current.name);
+    if (next === null) return;
+    const ok = await Anb.notebooks.setCurrentName(next);
+    if (!ok) {
+      alert('Name cannot be empty.');
+    }
+  }
+
+  function updateNotebookSlot() {
+    const el = document.getElementById('current-notebook-name');
+    if (!el) return;
+    el.textContent = '📓 ' + Anb.notebooks.getName();
+  }
+
+  // --- Open modal ----------------------------------------------------------
+
+  function showOpenModal() {
+    const list = document.getElementById('open-notebook-list');
+    const items = Anb.notebooks.list();
+
+    list.innerHTML = '';
+    if (items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'notebook-empty';
+      empty.textContent = 'No saved notebooks yet.';
+      list.appendChild(empty);
+    } else {
+      for (const nb of items) {
+        const row = document.createElement('div');
+        row.className = 'notebook-row' + (nb.isCurrent ? ' current' : '');
+        row.innerHTML = `
+          <div class="notebook-row-main" data-id="${escapeAttr(nb.id)}">
+            <span class="notebook-row-check">${nb.isCurrent ? '✓' : ''}</span>
+            <span class="notebook-row-name">${escapeHtml(nb.name)}</span>
+            <span class="notebook-row-meta">${nb.cellCount} cells · ${formatRelative(nb.updatedAt)}</span>
+          </div>
+          <button class="notebook-row-delete" data-id="${escapeAttr(nb.id)}" title="Delete this notebook" aria-label="Delete notebook">🗑</button>
+        `;
+        list.appendChild(row);
+      }
+      list.querySelectorAll('.notebook-row-main').forEach((el) => {
+        el.addEventListener('click', async () => {
+          const id = el.dataset.id;
+          await openAndClose(id);
+        });
+      });
+      list.querySelectorAll('.notebook-row-delete').forEach((el) => {
+        el.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const id = el.dataset.id;
+          const items2 = Anb.notebooks.list();
+          const nb = items2.find((x) => x.id === id);
+          if (!nb) return;
+          if (!confirm(`Delete notebook "${nb.name}"? This cannot be undone.`)) return;
+          await Anb.notebooks.deleteNotebook(id);
+          // The current notebook may have changed (either we deleted it, or another is now current)
+          Anb.cells.render(Anb.notebooks.getCurrentCells());
+          // Refresh the modal list (the deleted one is gone, and a new current may be marked)
+          showOpenModal();
+          flashStatus(`Deleted "${nb.name}".`);
+        });
+      });
+    }
+
+    document.getElementById('open-modal').classList.remove('hidden');
+  }
+
+  function hideOpenModal() {
+    document.getElementById('open-modal').classList.add('hidden');
+  }
+
+  async function openAndClose(id) {
+    if (id === Anb.notebooks.getId()) {
+      hideOpenModal();
+      return;
+    }
+    await Anb.notebooks.switchTo(id);
+    Anb.cells.render(Anb.notebooks.getCurrentCells());
+    hideOpenModal();
+    const first = Anb.cells.getCells()[0];
+    if (first && first.cm) setTimeout(() => Anb.editor.focus(first.cm), 50);
+    flashStatus(`Opened "${Anb.notebooks.getName()}".`);
+  }
+
+  function formatRelative(ts) {
+    const diff = Date.now() - ts;
+    const sec = Math.floor(diff / 1000);
+    if (sec < 60) return 'just now';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 30) return `${day}d ago`;
+    return new Date(ts).toLocaleDateString();
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s);
+  }
+
+  // --- theme ---------------------------------------------------------------
 
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
@@ -147,6 +343,8 @@
       if (cell.cm) Anb.editor.setTheme(cell.cm, cmTheme);
     }
   }
+
+  // --- status flash --------------------------------------------------------
 
   let statusTimer = null;
   function flashStatus(msg) {
@@ -174,7 +372,7 @@
 
   // Expose for debugging / testing if needed
   window.Anb = window.Anb || {};
-  window.Anb.main = { applyTheme, saveNotebook };
+  window.Anb.main = { applyTheme, saveNotebook, updateNotebookSlot };
 
   main().catch((err) => {
     console.error('Failed to start AgenticNotebook:', err);
