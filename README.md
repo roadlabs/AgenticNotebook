@@ -139,7 +139,6 @@ Please respond to Cell N.
 | 厂商 | Base URL | Model 例子 |
 |---|---|---|
 | Agnes（默认） | `https://api.agnes-ai.cn/v1` | `agnes-3.0-flash` |
-| DeepSeek | `https://api.deepseek.com` | `DeepSeek-V4.1-Flash` |
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
 | Moonshot (Kimi) | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
 | 智谱 (GLM) | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` |
