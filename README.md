@@ -135,7 +135,7 @@ Please respond to Cell N.
 
 把当前 notebook 导成一个**可独立运行的对话式 agent**（单文件 `.html`）：
 
-- 打开后是一套聊天界面；**整个 notebook 的内容烘焙成 system prompt** 作为 agent 的背景知识，上方可折叠展示
+- 打开后是一套聊天界面；**整个 notebook 的内容烘焙成 system prompt** 作为 agent 的背景知识（不直接展示 notebook 原文，内容只作为 agent 的内部上下文）
 - 内置 OpenAI 兼容流式调用（SSE），回复实时渲染 Markdown + KaTeX + 代码高亮
 - 导出时把当前的 **Base URL / Model** 烘焙成默认值（默认 Agnes），右上角 ⚙ 可改；**API Key 只存本地浏览器**（localStorage），不进文件
 - 对话历史只在当前页面会话内有效；🗑 清空对话

@@ -292,13 +292,6 @@ ${cellsHtml}
     }
 
     const name = Anb.notebooks.getName();
-    const cellsHtml = cells.map((c, i) => {
-      const inputHtml = c.content ? renderMarkdown(c.content) : '';
-      const outputHtml = c.output ? renderMarkdown(c.output) : '';
-      return `      <div class="kb-cell">
-        <div class="kb-cell-label">[${i + 1}]</div>
-${inputHtml ? `        <div class="kb-cell-input">${inputHtml}</div>\n` : ''}${outputHtml ? `        <div class="kb-cell-output">${outputHtml}</div>\n` : ''}      </div>`;
-    }).join('\n');
 
     // System prompt: whole notebook as the agent's background knowledge
     const sysParts = cells.map((c, i) => {
@@ -338,13 +331,6 @@ ${inputHtml ? `        <div class="kb-cell-input">${inputHtml}</div>\n` : ''}${o
   .spacer { flex: 1; }
   .icon-btn { width: 32px; height: 32px; border: 1px solid #e4e4e7; background: #fff; border-radius: 6px; cursor: pointer; font-size: 16px; line-height: 1; }
   .icon-btn:hover { background: #f0f0f0; }
-  /* ---- knowledge (notebook background) ---- */
-  .knowledge { margin: 12px 16px 0; background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; max-height: 38vh; display: flex; flex-direction: column; }
-  .knowledge summary { cursor: pointer; padding: 10px 14px; font-size: 13px; color: #666; background: #fafafa; border-radius: 8px 8px 0 0; user-select: none; }
-  .knowledge[open] .knowledge-body { overflow: auto; }
-  .kb-cell { border-top: 1px solid #eee; padding: 12px 14px; }
-  .kb-cell:first-child { border-top: none; }
-  .kb-cell-label { font-family: 'JetBrains Mono', 'Menlo', monospace; font-size: 11px; color: #888; margin-bottom: 6px; }
   /* ---- chat ---- */
   .chat { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 12px 16px 16px; background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; overflow: hidden; }
   .messages { flex: 1; overflow-y: auto; padding: 16px; }
@@ -402,13 +388,6 @@ ${inputHtml ? `        <div class="kb-cell-input">${inputHtml}</div>\n` : ''}${o
     <div class="spacer"></div>
     <button class="icon-btn" id="btn-settings" title="LLM Settings" aria-label="LLM Settings">⚙️</button>
   </header>
-
-  <details class="knowledge" open>
-    <summary>📚 Notebook background (${cells.length} cells)</summary>
-    <div class="knowledge-body">
-${cellsHtml}
-    </div>
-  </details>
 
   <main class="chat">
     <div id="messages" class="messages"></div>
@@ -535,7 +514,7 @@ function streamChat(opts) {
 }
 
 /* ===== chat ===== */
-var history = [ { role: "system", content: SYSTEM_PROMPT } ];
+var chatHistory = [ { role: "system", content: SYSTEM_PROMPT } ];
 var messagesEl = document.getElementById("messages");
 var form = document.getElementById("chat-form");
 var input = document.getElementById("chat-input");
@@ -552,7 +531,7 @@ function addBubble(role, html) {
 }
 function addUser(text) { return addBubble("user", escapeHtml(text)); }
 function clearChat() {
-  history = [ { role: "system", content: SYSTEM_PROMPT } ];
+  chatHistory = [ { role: "system", content: SYSTEM_PROMPT } ];
   messagesEl.innerHTML = "";
   addBubble("assistant", '<div class="hint">Ask me anything about this notebook.</div>');
 }
@@ -564,7 +543,7 @@ form.addEventListener("submit", function (e) {
   var text = input.value.trim();
   if (!text) return;
   input.value = "";
-  history.push({ role: "user", content: text });
+  chatHistory.push({ role: "user", content: text });
   addUser(text);
   busy = true;
   sendBtn.disabled = true;
@@ -577,14 +556,14 @@ form.addEventListener("submit", function (e) {
 
   streamChat({
     settings: loadSettings(),
-    messages: history,
+    messages: chatHistory,
     onChunk: function (d, full) { raw = full; schedule(); },
     onDone: function (full) {
       if (timer) { clearTimeout(timer); timer = null; }
       raw = full;
       bubble.innerHTML = renderMarkdown(full);
       messagesEl.scrollTop = messagesEl.scrollHeight;
-      history.push({ role: "assistant", content: full });
+      chatHistory.push({ role: "assistant", content: full });
       busy = false; sendBtn.disabled = false; input.focus();
     },
     onError: function (err) {
