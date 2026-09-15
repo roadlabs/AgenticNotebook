@@ -66,26 +66,30 @@
   cursor: grabbing;
 }
 
-/* Tool-cell badge (⚒) */
+/* Tool-cell badge (</> marks a tool cell; md cells stay unmarked, like
+   Jupyter's code cells carry In[n] while markdown cells don't) */
 .cell-type-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
   height: 20px;
+  padding: 0 6px;
   margin-right: 4px;
   border-radius: 4px;
-  font-size: 12px;
-  background: rgba(255, 193, 7, 0.18);
-  color: #b8860b;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  background: rgba(74, 158, 255, 0.15);
+  color: #4a9eff;
   flex-shrink: 0;
   user-select: none;
   cursor: default;
 }
 
 html[data-theme="light"] .cell-type-badge {
-  background: rgba(255, 193, 7, 0.22);
-  color: #8a6d00;
+  background: rgba(31, 111, 235, 0.12);
+  color: #1f6feb;
 }
 
 .cell-dragging {

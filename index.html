@@ -103,14 +103,14 @@
     <table class="help-table">
       <tbody>
         <tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>运行当前 cell，跳到下一个（末格自动新建）</td></tr>
-        <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd></td><td>运行 Tool cell（⚒，Ctrl 或 Cmd 都可）</td></tr>
+        <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd></td><td>运行 Tool cell（<code>&lt;/&gt;</code>，Ctrl 或 Cmd 都可）</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>关闭弹出的 modal</td></tr>
         <tr><td>👁 / ✏</td><td>在 cell 内切换 渲染预览 ↔ 源码编辑</td></tr>
-        <tr><td>⚒ / 📝</td><td>把 cell 在 Tool 与普通 Markdown 之间切换（hover 工具栏）</td></tr>
+        <tr><td><code>&lt;/&gt;</code> / <code>M</code></td><td>把 cell 在 Tool 与普通 Markdown 之间切换（hover 工具栏）</td></tr>
         <tr><td>拖拽顶栏</td><td>调整 cell 顺序（拖到目标上半区=插前面，下半区=插后面）</td></tr>
       </tbody>
     </table>
-    <p class="modal-hint">Tool cell：Edit ▸ New Tool Cell 新建；Ctrl+Enter 运行。纯文字 → LLM 生成代码（模式 A）；文字+代码 → 本地真实执行 + 测试 + LLM 评估（模式 B）。已注册的工具在 ⚙ 设置里可见/可删。</p>
+    <p class="modal-hint">Tool cell：Edit ▸ New Tool Cell 新建（或 hover cell 点 <code>&lt;/&gt;</code> 转换）；Ctrl+Enter 运行。纯文字 → LLM 生成代码（模式 A）；文字+代码 → 本地真实执行 + 测试 + LLM 评估（模式 B）。已注册的工具在 ⚙ 设置里可见/可删。</p>
     <div class="modal-actions">
       <button type="button" id="help-close">Close</button>
     </div>

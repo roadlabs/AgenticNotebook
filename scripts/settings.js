@@ -93,7 +93,7 @@ window.Anb = window.Anb || {};
         const info = document.createElement('div');
         info.className = 'tool-row-info';
         info.innerHTML =
-          `<div class="tool-row-name">⚒ ${escapeHtml(t.name)}</div>` +
+          `<div class="tool-row-name">${escapeHtml(t.name)}</div>` +
           `<div class="tool-row-desc">${escapeHtml(t.description || '')}</div>`;
         row.appendChild(info);
         row.appendChild(del);

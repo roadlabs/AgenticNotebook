@@ -7,7 +7,7 @@
 
 支持**多 notebook**（在浏览器 IndexedDB 中保存多个独立笔记本）、**预览/编辑双模式**（Jupyter 风格：Shift+Enter 提交后自动渲染）、**Markdown + LaTeX 渲染**、**拖拽排序**。
 
-除普通 Markdown cell 外，还支持 **Tool cell**（⚒）：在 cell 里写文字 + 可选 JS 代码，Ctrl+Enter 让 LLM 帮你**生成工具代码**，或在浏览器里**本地真实执行**代码与测试；注册后的工具会成为全局 Registry 里的 **tools**，后续普通 cell 运行时 LLM 可以**调用这些本地工具**（function calling）。
+除普通 Markdown cell 外，还支持 **Tool cell**（`</>` 徽标）：在 cell 里写文字 + 可选 JS 代码，Ctrl+Enter 让 LLM 帮你**生成工具代码**，或在浏览器里**本地真实执行**代码与测试；注册后的工具会成为全局 Registry 里的 **tools**，后续普通 cell 运行时 LLM 可以**调用这些本地工具**（function calling）。
 
 ---
 
@@ -81,7 +81,7 @@ python3 -m http.server 8765
 | 图标 | 作用 |
 |---|---|
 | **▶** | 运行当前 cell（拼上下文 → 调 LLM → 流式写入输出区） |
-| **⚒ / 📝** | **切换 cell 类型**：普通 cell 显示 ⚒（点它变成 Tool cell）；Tool cell 显示 📝（点它变回普通 Markdown cell）。切换保留内容与输出，即时保存 |
+| **`</>` / `M`** | **切换 cell 类型**：普通 cell 显示 `</>`（点它变成 Tool cell）；Tool cell 显示 `M`（点它变回普通 Markdown cell）。切换保留内容与输出，即时保存 |
 | **👁** | 切换预览/源码模式（眼睛=在源码，点变 ✏=切到预览；运行后会自动切到预览） |
 | **⏫** | 在当前 cell **上方**插入一个空白 cell 并 focus |
 | **⏬** | 在当前 cell **下方**插入一个空白 cell 并 focus |
@@ -100,9 +100,9 @@ python3 -m http.server 8765
 
 ---
 
-## Tool cell（⚒）
+## Tool cell（`</>`）
 
-普通 Markdown cell 之外的第二类 cell。两种创建方式：**Edit ▸ New Tool Cell** 在末尾新建，或**hover 任意 cell 点 ⚒ 按钮**把现有 cell 转成 Tool cell（再点 📝 可转回普通 Markdown cell）。Tool cell 顶栏有 **⚒** 徽标；保存时 `type` 一并持久化，刷新后仍是 Tool cell。
+普通 Markdown cell 之外的第二类 cell。两种创建方式：**Edit ▸ New Tool Cell** 在末尾新建，或**hover 任意 cell 点 `</>` 按钮**把现有 cell 转成 Tool cell（再点 `M` 可转回普通 Markdown cell）。Tool cell 顶栏有 **`</>`** 徽标（代码图标，暗示里面是可执行 JS）；普通 Markdown cell 不加类型标记（沿用 Jupyter 的惯例：代码 cell 有 `In[n]` 提示符/行号，markdown cell 更安静）。保存时 `type` 一并持久化，刷新后仍是 Tool cell。
 
 **运行方式是 Ctrl+Enter**（或点 ▶，效果一样）。根据 cell 内容分两种模式：
 

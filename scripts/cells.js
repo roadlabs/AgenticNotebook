@@ -239,7 +239,7 @@ Respond only to the current cell, using prior cells as background.`;
       });
 
       for (const tc of toolCalls) {
-        appendOutputHtml(`<div class="tool-inline">⚒ Running tool \`${escapeHtml(tc.name)}\`…</div>`);
+        appendOutputHtml(`<div class="tool-inline">▶ Running tool \`${escapeHtml(tc.name)}\`…</div>`);
         let result;
         let resultStr;
         try {
@@ -403,7 +403,7 @@ Do not include any other text — only the two fenced blocks.`;
       });
       cell.outputEl.insertAdjacentHTML(
         'beforeend',
-        `<div class="tool-registered">⚒ Registered tool \`${escapeHtml(name)}\`.</div>`
+        `<div class="tool-registered">✓ Registered tool \`${escapeHtml(name)}\`.</div>`
       );
       if (!toolDef) {
         cell.outputEl.insertAdjacentHTML(
@@ -574,7 +574,7 @@ Return your evaluation as markdown.`;
       if (l) {
         l.outputEl.insertAdjacentHTML(
           'beforeend',
-          `<div class="tool-registered">⚒ Registered tool \`${escapeHtml(name)}\`.</div>`
+          `<div class="tool-registered">✓ Registered tool \`${escapeHtml(name)}\`.</div>`
         );
       }
     } catch (err) {
@@ -1100,7 +1100,7 @@ input.focus();
     if (cell.type === 'tool') {
       const badge = document.createElement('span');
       badge.className = 'cell-type-badge';
-      badge.textContent = '⚒';
+      badge.textContent = '</>';
       badge.title = 'Tool cell — Ctrl+Enter runs it';
       topBar.appendChild(badge);
     }
@@ -1119,11 +1119,11 @@ input.focus();
     runBtn.addEventListener('click', () => onRunClick(cell.id));
 
     // Type toggle: md ↔ tool. The cell is fully rebuilt by rerenderAll()
-    // afterwards, so the run title, ⚒ badge and Ctrl+Enter listener all pick
+    // afterwards, so the run title, badge and Ctrl+Enter listener all pick
     // up the new type. Content and output are preserved.
     const typeToggleBtn = document.createElement('button');
     typeToggleBtn.className = 'cell-btn cell-type-toggle';
-    typeToggleBtn.textContent = cell.type === 'tool' ? '📝' : '⚒';
+    typeToggleBtn.textContent = cell.type === 'tool' ? 'M' : '</>';
     typeToggleBtn.title = cell.type === 'tool'
       ? 'Convert to Markdown cell'
       : 'Convert to Tool cell (Ctrl+Enter runs it locally)';
