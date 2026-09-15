@@ -104,6 +104,12 @@ window.Anb = window.Anb || {};
         'Shift-Enter': (cm) => {
           const evt = new CustomEvent('cell:shift-enter', { bubbles: true });
           cm.getWrapperElement().dispatchEvent(evt);
+        },
+        // Ctrl+Enter: run a tool cell. CodeMirror normalizes Mac Cmd+Enter
+        // and Win/Linux Ctrl+Enter to the same 'Ctrl-Enter' key name.
+        'Ctrl-Enter': (cm) => {
+          const evt = new CustomEvent('cell:ctrl-enter', { bubbles: true });
+          cm.getWrapperElement().dispatchEvent(evt);
         }
       }
     });

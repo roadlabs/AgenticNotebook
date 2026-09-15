@@ -20,6 +20,7 @@
     savePending = false;
     const data = Anb.cells.getCells().map((c) => ({
       id: c.id,
+      type: c.type || 'md',
       content: c.content,
       output: c.output
     }));
@@ -133,6 +134,10 @@
           break;
         case 'add-above':
           Anb.cells.addCell('above', 0);
+          break;
+        case 'add-tool-cell':
+          Anb.cells.addCell('below', Anb.cells.getCells().length - 1, { type: 'tool' });
+          flashStatus('Tool cell added.');
           break;
         case 'clear-outputs':
           Anb.cells.clearAllOutputs();

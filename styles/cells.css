@@ -66,6 +66,28 @@
   cursor: grabbing;
 }
 
+/* Tool-cell badge (⚒) */
+.cell-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: rgba(255, 193, 7, 0.18);
+  color: #b8860b;
+  flex-shrink: 0;
+  user-select: none;
+  cursor: default;
+}
+
+html[data-theme="light"] .cell-type-badge {
+  background: rgba(255, 193, 7, 0.22);
+  color: #8a6d00;
+}
+
 .cell-dragging {
   opacity: 0.35;
 }
@@ -426,5 +448,89 @@
   border-radius: 0 4px 4px 0;
   margin: 8px 0;
   font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  font-size: 13px;
+}
+
+/* ---------- Tool-cell results (Mode B) ---------- */
+.tool-results {
+  margin: 4px 0 12px;
+}
+
+.tool-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.tool-table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+  width: 100%;
+}
+
+.tool-table th, .tool-table td {
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tool-table th {
+  background: var(--bg-cell);
+  font-weight: 600;
+}
+
+.tool-table td { word-break: break-word; }
+
+.tool-pass { color: var(--success); }
+.tool-fail { color: var(--error); }
+
+.tool-tests { margin: 8px 0; font-size: 13px; }
+.tool-tests > div { padding: 2px 0; }
+
+.tool-logs {
+  margin: 8px 0;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  font-size: 12px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.tool-logs-title {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.tool-log { white-space: pre-wrap; word-break: break-all; }
+.tool-log-m { color: var(--accent); margin-right: 6px; }
+
+.tool-eval {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.tool-eval > *:first-child { margin-top: 0; }
+
+.tool-inline {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  padding: 2px 0;
+}
+
+.tool-registered {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: rgba(81, 207, 102, 0.10);
+  border-left: 3px solid var(--success);
+  border-radius: 0 4px 4px 0;
+  color: var(--success);
   font-size: 13px;
 }

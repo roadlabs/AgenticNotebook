@@ -14,13 +14,16 @@ window.Anb = window.Anb || {};
    * @param {string} opts.apiKey
    * @param {string} opts.model
    * @param {Array}  opts.messages
-   * @param {Function} opts.onChunk   (delta, accumulated) => void
-   * @param {Function} opts.onDone    (accumulated) => void
-   * @param {Function} opts.onError   (err) => void
+   * @param {Array}  [opts.tools]      OpenAI `tools` array (function calling)
+   * @param {Function} opts.onChunk    (delta, accumulated) => void
+   * @param {Function} opts.onDone     (accumulated) => void
+   * @param {Function} opts.onToolCall (tc) => void — per COMPLETE tool call,
+   *                                   emitted at stream end; tc = {id,name,arguments}
+   * @param {Function} opts.onError    (err) => void
    * @param {AbortSignal} [opts.signal]
    */
   async function streamChatCompletion(opts) {
-    const { baseUrl, apiKey, model, messages, onChunk, onDone, onError, signal } = opts;
+    const { baseUrl, apiKey, model, messages, tools, onChunk, onDone, onToolCall, onError, signal } = opts;
 
     if (!apiKey) {
       onError(new Error('Missing API Key — open ⚙ Settings to set it.'));
@@ -65,7 +68,8 @@ window.Anb = window.Anb || {};
           model,
           messages,
           stream: true,
-          stream_options: { include_usage: true }
+          stream_options: { include_usage: true },
+          ...(tools && tools.length ? { tools } : {})
         }),
         signal
       });
@@ -107,6 +111,55 @@ window.Anb = window.Anb || {};
     let buffer = '';
     let accumulated = '';
 
+    // Accumulate fragmented tool_calls deltas per index.
+    // Each entry: { id, type, name, args } where `args` is the raw JSON string.
+    const toolCallMap = new Map();
+
+    function emitToolCalls() {
+      if (typeof onToolCall !== 'function') return;
+      const entries = Array.from(toolCallMap.entries()).sort((a, b) => a[0] - b[0]);
+      for (const [, tc] of entries) {
+        if (!tc.name) {
+          // Some providers emit finish_reason:"tool_calls" without a name
+          // (e.g. only when no deltas carried one) — skip rather than emit garbage.
+          console.warn('llm: tool_calls chunk without a name skipped', tc);
+          continue;
+        }
+        onToolCall({
+          id: tc.id || 'call_' + tc.index,
+          name: tc.name,
+          arguments: tc.args || ''
+        });
+      }
+      toolCallMap.clear();
+    }
+
+    function handleDelta(obj) {
+      const delta = obj.choices?.[0]?.delta?.content;
+      if (delta) {
+        accumulated += delta;
+        onChunk(delta, accumulated);
+      }
+      const tcs = obj.choices?.[0]?.delta?.tool_calls;
+      if (!Array.isArray(tcs)) return;
+      for (const tc of tcs) {
+        // `index` is required by the OpenAI spec but some providers omit it
+        // on continuation chunks; fall back to the most recent entry.
+        const idx = tc.index !== undefined ? tc.index : toolCallMap.size - 1;
+        let entry = toolCallMap.get(idx);
+        if (!entry) {
+          entry = { index: idx, id: null, type: 'function', name: null, args: '' };
+          toolCallMap.set(idx, entry);
+        }
+        if (tc.id) entry.id = tc.id;
+        if (tc.type) entry.type = tc.type;
+        if (tc.function) {
+          if (tc.function.name) entry.name = tc.function.name;
+          if (tc.function.arguments != null) entry.args += tc.function.arguments;
+        }
+      }
+    }
+
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -123,7 +176,8 @@ window.Anb = window.Anb || {};
 
           const payload = line.slice(5).trim();
           if (payload === '[DONE]') {
-            onDone(accumulated);
+            emitToolCalls();
+            await onDone(accumulated);
             return;
           }
 
@@ -140,14 +194,11 @@ window.Anb = window.Anb || {};
             return;
           }
 
-          const delta = obj.choices?.[0]?.delta?.content;
-          if (delta) {
-            accumulated += delta;
-            onChunk(delta, accumulated);
-          }
+          handleDelta(obj);
         }
       }
-      onDone(accumulated);
+      emitToolCalls();
+      await onDone(accumulated);
     } catch (err) {
       if (err.name === 'AbortError') {
         onError(new Error('Request aborted.'));

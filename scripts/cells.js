@@ -28,6 +28,7 @@ window.Anb = window.Anb || {};
   function render(cellsData) {
     cells = (cellsData || []).map((c) => ({
       id: c.id || newId(),
+      type: c.type === 'tool' ? 'tool' : 'md',
       content: c.content || '',
       output: c.output || '',
       status: 'idle',
@@ -53,8 +54,8 @@ window.Anb = window.Anb || {};
     refreshAllLabels();
   }
 
-  function addCell(position = 'below', atIndex = -1) {
-    const newCell = createBlankCell();
+  function addCell(position = 'below', atIndex = -1, options = {}) {
+    const newCell = createBlankCell(options.type);
     let insertAt;
     if (position === 'above') {
       insertAt = atIndex >= 0 ? atIndex : 0;
@@ -113,6 +114,12 @@ window.Anb = window.Anb || {};
       return;
     }
 
+    // Tool cells have their own run flow (Ctrl+Enter; ▶ also routes here).
+    if (cell.type === 'tool') {
+      await handleCtrlEnter(id, settings);
+      return;
+    }
+
     const sysPrompt = `You are an AI assistant in an AgenticNotebook.
 The user provides content from prior notebook cells as background context, then the current cell.
 Respond only to the current cell, using prior cells as background.`;
@@ -153,27 +160,193 @@ Respond only to the current cell, using prior cells as background.`;
       renderTimer = setTimeout(flushRender, 200);
     }
 
+    function appendOutputHtml(html) {
+      const liveCell = cells.find((c) => c.id === id);
+      if (!liveCell) return;
+      const placeholder = liveCell.outputEl.querySelector('.output-streaming');
+      if (placeholder) placeholder.outerHTML = html;
+      else liveCell.outputEl.insertAdjacentHTML('beforeend', html);
+    }
+
+    // Finalize the output area after the (possibly multi-round) stream.
+    function finalize(finalText) {
+      if (renderTimer) {
+        clearTimeout(renderTimer);
+        renderTimer = null;
+      }
+      cell.output = finalText;
+      cell.outputEl.innerHTML = renderMarkdown(finalText);
+      cell.status = 'idle';
+      cell.runBtn.disabled = false;
+      cell.cellEl.classList.remove('cell-running');
+      saveNotebookDebounced();
+    }
+
+    const tools = await Anb.tools.toApiTools();
+
+    await handleToolCallLoop({
+      cell,
+      settings,
+      messages,
+      tools,
+      scheduleRender,
+      appendOutputHtml,
+      finalize
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Function-calling loop for md cells (uses the global tool registry)
+  // ------------------------------------------------------------------
+
+  async function handleToolCallLoop({ cell, settings, messages, tools, scheduleRender, appendOutputHtml, finalize }) {
+    let accumulated = '';
+    const MAX_ITER = 8;
+
+    for (let iter = 0; iter < MAX_ITER; iter++) {
+      const { content, toolCalls } = await new Promise((resolve, reject) => {
+        const calls = [];
+        llm.streamChatCompletion({
+          baseUrl: settings.baseUrl,
+          apiKey: settings.apiKey,
+          model: settings.model,
+          messages,
+          tools: tools.length ? tools : undefined,
+          onChunk: (_delta, full) => {
+            accumulated = full;
+            scheduleRender();
+          },
+          onDone: (full) => resolve({ content: full, toolCalls: calls }),
+          onError: (err) => reject(err),
+          onToolCall: (tc) => calls.push(tc)
+        });
+      });
+
+      if (!toolCalls.length) {
+        finalize(accumulated);
+        return;
+      }
+
+      // Replay the assistant message with the tool_calls it requested.
+      messages.push({
+        role: 'assistant',
+        content: content || null,
+        tool_calls: toolCalls.map((tc) => ({
+          id: tc.id,
+          type: 'function',
+          function: { name: tc.name, arguments: tc.arguments }
+        }))
+      });
+
+      for (const tc of toolCalls) {
+        appendOutputHtml(`<div class="tool-inline">⚒ Running tool \`${escapeHtml(tc.name)}\`…</div>`);
+        let result;
+        let resultStr;
+        try {
+          let args;
+          try {
+            args = tc.arguments ? JSON.parse(tc.arguments) : {};
+          } catch {
+            args = {};
+          }
+          result = await Anb.tools.execute(tc.name, args);
+          resultStr = Anb.tools.safeSerialize(result);
+        } catch (err) {
+          resultStr = { __error: String((err && err.message) || err) };
+        }
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: Anb.tools.truncate(JSON.stringify(resultStr), 10000)
+        });
+        const preview = Anb.tools.truncate(JSON.stringify(resultStr), 500);
+        appendOutputHtml(`<div class="tool-inline">✓ \`${escapeHtml(tc.name)}\` → \`${escapeHtml(preview)}\`</div>`);
+      }
+    }
+
+    appendOutputHtml('<div class="output-error">⚠ Stopped after 8 tool-call iterations.</div>');
+    finalize(accumulated);
+  }
+
+  // ------------------------------------------------------------------
+  // Tool cells — Ctrl+Enter: Mode A (codegen) / Mode B (local test+eval)
+  // ------------------------------------------------------------------
+
+  async function handleCtrlEnter(id, settings) {
+    const cell = cells.find((c) => c.id === id);
+    if (!cell) return;
+    if (!settings) settings = await Anb.settings.load();
+
+    if (!cell.content.trim()) {
+      cell.outputEl.innerHTML = '<div class="output-empty">⚠ Empty tool cell — nothing to run.</div>';
+      return;
+    }
+
+    const parsed = Anb.tools.parseContent(cell.content);
+    if (parsed.code) {
+      await runModeB(cell, settings, parsed);
+    } else {
+      await runModeA(cell, settings);
+    }
+  }
+
+  // --- Mode A: text-only → ask the LLM to generate a tool (def + code) ---
+
+  async function runModeA(cell, settings) {
+    const id = cell.id;
+    cell.output = '';
+    cell.status = 'running';
+    cell.outputEl.innerHTML = '<div class="output-streaming">Generating tool…</div>';
+    cell.runBtn.disabled = true;
+    cell.cellEl.classList.add('cell-running');
+    cell.cellEl.classList.remove('cell-error');
+
+    let accumulated = '';
+    let renderTimer = null;
+    const scheduleRender = () => {
+      if (renderTimer) return;
+      renderTimer = setTimeout(() => {
+        renderTimer = null;
+        const live = cells.find((c) => c.id === id);
+        if (live) live.outputEl.innerHTML = renderMarkdown(accumulated);
+      }, 200);
+    };
+
+    const sysPrompt = `You are a code generator inside an AgenticNotebook.
+The user describes a JavaScript function they want. Your task: return EXACTLY two fenced code blocks:
+
+1. A \`\`\`tool-def block containing a single JSON object describing the tool:
+   { "name": "<camelCase name, must match the function name>", "description": "<short description>", "parameters": <JSON Schema for the function arguments> }
+   The parameters schema must be a JSON Schema object of type "object" with "properties" and "required".
+
+2. A \`\`\`js block containing ONE self-contained, pure JavaScript function declaration
+   (no DOM, no fetch, no external libs) whose name equals the tool-def "name",
+   returning a JSON-serializable value.
+
+Do not include any other text — only the two fenced blocks.`;
+
+    const userContent = `Describe the tool I want (text only, no code yet):\n\n${cell.content.trim()}`;
+
     await llm.streamChatCompletion({
       baseUrl: settings.baseUrl,
       apiKey: settings.apiKey,
       model: settings.model,
-      messages,
+      messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: userContent }
+      ],
       onChunk: (_delta, full) => {
         accumulated = full;
         scheduleRender();
       },
-      onDone: (full) => {
+      onDone: async (full) => {
         if (renderTimer) {
           clearTimeout(renderTimer);
           renderTimer = null;
         }
         accumulated = full;
-        cell.output = accumulated;
         cell.outputEl.innerHTML = renderMarkdown(accumulated);
-        cell.status = 'idle';
-        cell.runBtn.disabled = false;
-        cell.cellEl.classList.remove('cell-running');
-        saveNotebookDebounced();
+        finishCodegen(cell, accumulated);
       },
       onError: (err) => {
         if (renderTimer) {
@@ -181,8 +354,7 @@ Respond only to the current cell, using prior cells as background.`;
           renderTimer = null;
         }
         const before = accumulated ? renderMarkdown(accumulated) : '';
-        const errHtml = `<div class="output-error">❌ ${escapeHtml(err.message)}</div>`;
-        cell.outputEl.innerHTML = before + errHtml;
+        cell.outputEl.innerHTML = before + `<div class="output-error">❌ ${escapeHtml(err.message)}</div>`;
         cell.output = accumulated;
         cell.status = 'error';
         cell.runBtn.disabled = false;
@@ -191,6 +363,275 @@ Respond only to the current cell, using prior cells as background.`;
         saveNotebookDebounced();
       }
     });
+  }
+
+  async function finishCodegen(cell, responseText) {
+    const id = cell.id;
+    const { toolDef, code } = Anb.tools.parseCodegen(responseText);
+
+    if (!code) {
+      cell.outputEl.innerHTML =
+        renderMarkdown(responseText) +
+        `<div class="output-error">⚠ The model did not return a code block — nothing registered.</div>`;
+      cell.output = responseText;
+      cell.status = 'error';
+      cell.runBtn.disabled = false;
+      cell.cellEl.classList.remove('cell-running');
+      cell.cellEl.classList.add('cell-error');
+      saveNotebookDebounced();
+      return;
+    }
+
+    // Derive a name: tool-def name if present, else from the code.
+    const fnName = (toolDef && toolDef.name) || Anb.tools.deriveFnName(code);
+    const name = fnName || 'tool_' + Date.now().toString(36).slice(-6);
+
+    // Append the generated code to the cell as a markdown code fence and
+    // switch to preview so it renders as highlighted markdown.
+    cell.content += '\n\n```js\n' + code + '\n```';
+    Anb.editor.setValue(cell.cm, cell.content);
+    refreshLabel(cell);
+    setCellPreview(id, true);
+
+    // Register the tool in the global registry.
+    try {
+      await Anb.tools.register({
+        name,
+        description: (toolDef && toolDef.description) || 'Generated tool',
+        parameters: toolDef && toolDef.parameters,
+        code
+      });
+      cell.outputEl.insertAdjacentHTML(
+        'beforeend',
+        `<div class="tool-registered">⚒ Registered tool \`${escapeHtml(name)}\`.</div>`
+      );
+      if (!toolDef) {
+        cell.outputEl.insertAdjacentHTML(
+          'beforeend',
+          `<div class="output-error">⚠ The model omitted the tool-def block — registered with a minimal schema (parameters={}).</div>`
+        );
+      }
+    } catch (err) {
+      cell.outputEl.insertAdjacentHTML(
+        'beforeend',
+        `<div class="output-error">❌ Failed to register tool: ${escapeHtml(err.message)}</div>`
+      );
+    }
+
+    cell.output = responseText + '\n\n[Tool registered: ' + name + ']';
+    cell.status = 'idle';
+    cell.runBtn.disabled = false;
+    cell.cellEl.classList.remove('cell-running');
+    saveNotebookDebounced();
+  }
+
+  // --- Mode B: text + code → local real execution + tests, then LLM eval ---
+
+  async function runModeB(cell, settings, parsed) {
+    const id = cell.id;
+    cell.output = '';
+    cell.status = 'running';
+    cell.outputEl.innerHTML = '<div class="output-streaming">Running locally…</div>';
+    cell.runBtn.disabled = true;
+    cell.cellEl.classList.add('cell-running');
+    cell.cellEl.classList.remove('cell-error');
+
+    const live = () => cells.find((c) => c.id === id);
+    const setRunningMsg = (msg) => {
+      const l = live();
+      if (l) l.outputEl.innerHTML = `<div class="output-streaming">${msg}</div>`;
+    };
+
+    // 1. Local real execution
+    const exec = await Anb.tools.runLocal({
+      code: parsed.code,
+      fnName: parsed.fnName,
+      tests: parsed.tests,
+      ioCases: parsed.ioCases,
+      timeoutMs: 5000
+    });
+
+    if (exec.type === 'error') {
+      cell.outputEl.innerHTML =
+        `<div class="output-error">❌ Execution failed: ${escapeHtml(exec.error)}</div>`;
+      cell.output = 'Execution failed: ' + exec.error;
+      cell.status = 'error';
+      cell.runBtn.disabled = false;
+      cell.cellEl.classList.remove('cell-running');
+      cell.cellEl.classList.add('cell-error');
+      saveNotebookDebounced();
+      return;
+    }
+
+    const results = exec.results || { io: [], tests: [] };
+    const resultsHtml = renderLocalResults(results, exec.logs || [], parsed.ioCases.length, parsed.tests.length);
+    cell.outputEl.innerHTML = resultsHtml;
+    cell.output = '';
+
+    // 2. LLM evaluation (text + code + real results)
+    setRunningMsg('Evaluating with LLM…');
+
+    let accumulated = '';
+    let renderTimer = null;
+    const scheduleRender = () => {
+      if (renderTimer) return;
+      renderTimer = setTimeout(() => {
+        renderTimer = null;
+        const l = live();
+        if (l) l.outputEl.innerHTML = resultsHtml + renderMarkdown(accumulated);
+      }, 200);
+    };
+
+    const sysPrompt = `You are evaluating a JavaScript function in an AgenticNotebook tool cell.
+Below is the tool's description, its code, and the REAL execution results of its tests.
+Assess correctness, note any failing tests, and suggest improvements. Be concise.
+Return your evaluation as markdown.`;
+
+    const userContent = [
+      '## Tool description',
+      parsed.text || '(no description)',
+      '',
+      '## Code',
+      '```js',
+      parsed.code,
+      '```',
+      '',
+      '## Real test results (executed locally in the browser)',
+      '```json',
+      JSON.stringify(results, null, 2),
+      '```',
+      '',
+      '## Captured console output',
+      '```json',
+      JSON.stringify((exec.logs || []).slice(0, 100), null, 2),
+      '```',
+      '',
+      'Evaluate the function and its tests.'
+    ].join('\n');
+
+    await llm.streamChatCompletion({
+      baseUrl: settings.baseUrl,
+      apiKey: settings.apiKey,
+      model: settings.model,
+      messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: userContent }
+      ],
+      onChunk: (_delta, full) => {
+        accumulated = full;
+        scheduleRender();
+      },
+      onDone: async (full) => {
+        if (renderTimer) {
+          clearTimeout(renderTimer);
+          renderTimer = null;
+        }
+        accumulated = full;
+        const l = live();
+        if (l) l.outputEl.innerHTML = resultsHtml + `<div class="tool-eval">${renderMarkdown(full)}</div>`;
+        cell.output = resultsHtml + '\n\n## LLM Evaluation\n\n' + full;
+        await finishToolRegister(cell, parsed, exec);
+        cell.status = 'idle';
+        cell.runBtn.disabled = false;
+        cell.cellEl.classList.remove('cell-running');
+        saveNotebookDebounced();
+      },
+      onError: async (err) => {
+        if (renderTimer) {
+          clearTimeout(renderTimer);
+          renderTimer = null;
+        }
+        const before = accumulated ? renderMarkdown(accumulated) : '';
+        const l = live();
+        if (l) l.outputEl.innerHTML = resultsHtml + before + `<div class="output-error">❌ ${escapeHtml(err.message)}</div>`;
+        cell.output = 'Evaluation failed: ' + err.message;
+        cell.status = 'error';
+        cell.runBtn.disabled = false;
+        cell.cellEl.classList.remove('cell-running');
+        cell.cellEl.classList.add('cell-error');
+        // Still register the tool — the code itself ran fine.
+        try {
+          await Anb.tools.register({
+            name: parsed.fnName,
+            description: parsed.text.split('\n')[0].slice(0, 80) || 'Registered from tool cell',
+            code: parsed.code
+          });
+        } catch {}
+        saveNotebookDebounced();
+      }
+    });
+  }
+
+  async function finishToolRegister(cell, parsed, exec) {
+    try {
+      const name = parsed.fnName || 'tool_' + Date.now().toString(36).slice(-6);
+      await Anb.tools.register({
+        name,
+        description: (parsed.text.split('\n')[0] || '').slice(0, 80) || 'Registered from tool cell',
+        code: parsed.code
+      });
+      const l = cells.find((c) => c.id === cell.id);
+      if (l) {
+        l.outputEl.insertAdjacentHTML(
+          'beforeend',
+          `<div class="tool-registered">⚒ Registered tool \`${escapeHtml(name)}\`.</div>`
+        );
+      }
+    } catch (err) {
+      console.warn('tools: register failed', err);
+    }
+  }
+
+  function renderLocalResults(results, logs, nIo, nTests) {
+    const parts = [];
+    parts.push('<div class="tool-results">');
+    parts.push(`<div class="tool-summary">Local execution: ${nIo} I/O case(s), ${nTests} test block(s)</div>`);
+
+    if ((results.io || []).length) {
+      parts.push('<table class="tool-table"><thead><tr><th>#</th><th>input</th><th>expected</th><th>actual</th><th>status</th></tr></thead><tbody>');
+      results.io.forEach((row, i) => {
+        const cls = row.pass ? 'tool-pass' : 'tool-fail';
+        const status = row.pass ? '✓ pass' : (row.error ? '✗ error' : '✗ fail');
+        parts.push(
+          `<tr class="${cls}"><td>${i + 1}</td><td>${escapeHtml(JSON.stringify(row.input))}</td>` +
+          `<td>${escapeHtml(JSON.stringify(row.expected))}</td>` +
+          `<td>${row.error ? escapeHtml(row.error) : escapeHtml(JSON.stringify(row.actual))}</td>` +
+          `<td>${status}</td></tr>`
+        );
+      });
+      parts.push('</tbody></table>');
+    } else if (nIo) {
+      parts.push('<div class="tool-fail">No I/O cases were parsed.</div>');
+    }
+
+    if ((results.tests || []).length) {
+      parts.push('<div class="tool-tests">');
+      results.tests.forEach((t, i) => {
+        const cls = t.pass ? 'tool-pass' : 'tool-fail';
+        const label = t.pass ? '✓ test passed' : '✗ test failed';
+        parts.push(
+          `<div class="${cls}">Test ${i + 1}: ${label}` +
+          (t.error ? ` — ${escapeHtml(t.error)}` : '') +
+          '</div>'
+        );
+      });
+      parts.push('</div>');
+    } else if (nTests) {
+      parts.push('<div class="tool-fail">No test blocks were parsed.</div>');
+    }
+
+    if ((logs || []).length) {
+      parts.push('<div class="tool-logs"><div class="tool-logs-title">console output</div>');
+      logs.slice(0, 100).forEach((log) => {
+        parts.push(
+          `<div class="tool-log"><span class="tool-log-m">${escapeHtml(log.m)}</span> <span class="tool-log-a">${escapeHtml(JSON.stringify(log.a))}</span></div>`
+        );
+      });
+      parts.push('</div>');
+    }
+
+    parts.push('</div>');
+    return parts.join('');
   }
 
   async function runAll(settings) {
@@ -205,6 +646,7 @@ Respond only to the current cell, using prior cells as background.`;
       exportedAt: new Date().toISOString(),
       cells: cells.map((c) => ({
         id: c.id,
+        type: c.type || 'md',
         content: c.content,
         output: c.output
       }))
@@ -615,9 +1057,10 @@ input.focus();
     URL.revokeObjectURL(url);
   }
 
-  function createBlankCell() {
+  function createBlankCell(type) {
     return {
       id: newId(),
+      type: type === 'tool' ? 'tool' : 'md',
       content: '',
       output: '',
       status: 'idle',
@@ -653,6 +1096,15 @@ input.focus();
     handle.title = 'Drag to reorder';
     topBar.appendChild(handle);
 
+    // Tool-cell badge (distinguishes tool cells from plain md cells)
+    if (cell.type === 'tool') {
+      const badge = document.createElement('span');
+      badge.className = 'cell-type-badge';
+      badge.textContent = '⚒';
+      badge.title = 'Tool cell — Ctrl+Enter runs it';
+      topBar.appendChild(badge);
+    }
+
     const label = document.createElement('span');
     label.className = 'cell-label';
     cell.labelEl = label;
@@ -663,7 +1115,7 @@ input.focus();
     const runBtn = document.createElement('button');
     runBtn.className = 'cell-btn cell-run';
     runBtn.textContent = '▶';
-    runBtn.title = 'Run cell (Shift+Enter)';
+    runBtn.title = cell.type === 'tool' ? 'Run tool cell (Ctrl+Enter)' : 'Run cell (Shift+Enter)';
     runBtn.addEventListener('click', () => onRunClick(cell.id));
 
     const clearOutputBtn = document.createElement('button');
@@ -782,6 +1234,10 @@ input.focus();
     editor.getWrapper(cell.cm).addEventListener('cell:shift-enter', () => {
       handleShiftEnter(cell.id);
     });
+    editor.getWrapper(cell.cm).addEventListener('cell:ctrl-enter', () => {
+      const live = cells.find((cc) => cc.id === cell.id);
+      if (live && live.type === 'tool') handleCtrlEnter(live.id);
+    });
 
     // Apply initial mode (edit by default)
     applyCellMode(cell);
@@ -790,6 +1246,7 @@ input.focus();
   function rerenderAll() {
     const dataSnapshot = cells.map((c) => ({
       id: c.id,
+      type: c.type || 'md',
       content: c.content,
       output: c.output,
       previewMode: c.previewMode
@@ -812,13 +1269,19 @@ input.focus();
 
   async function onRunClick(id) {
     const settings = await Anb.settings.load();
+    const cell = cells.find((c) => c.id === id);
     await runCell(id, settings);
-    setCellPreview(id, true);
+    // Tool cells keep the editor open (their code stays visible in edit mode)
+    if (!cell || cell.type !== 'tool') setCellPreview(id, true);
   }
 
   async function handleShiftEnter(id) {
     const settings = await Anb.settings.load();
+    const cell = cells.find((c) => c.id === id);
     await runCell(id, settings);
+
+    // Tool cells don't auto-collapse to preview (their code stays editable)
+    if (cell && cell.type === 'tool') return;
 
     const idx = cells.findIndex((c) => c.id === id);
     if (idx < 0) return;
@@ -1057,6 +1520,7 @@ input.focus();
     exportNotebookHtml,
     exportNotebookAgent,
     toggleCellPreview,
-    setCellPreview
+    setCellPreview,
+    handleCtrlEnter
   };
 })();

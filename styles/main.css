@@ -294,6 +294,92 @@ body {
   line-height: 1.4;
 }
 
+/* ---------- Registered Tools (in the Settings modal) ---------- */
+.registered-tools-block {
+  margin-top: 4px;
+}
+
+.registered-tools-title {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.registered-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  background: var(--bg-root);
+}
+
+.tools-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-cell);
+}
+
+.tool-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tool-row-name {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-row-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-row-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 24px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-row-delete:hover {
+  background: var(--error);
+  color: white;
+  border-color: var(--error);
+}
+
 /* ---------- Inline current-notebook slot in topbar ---------- */
 .notebook-slot {
   display: flex;

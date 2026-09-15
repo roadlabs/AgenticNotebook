@@ -7,6 +7,8 @@
 
 支持**多 notebook**（在浏览器 IndexedDB 中保存多个独立笔记本）、**预览/编辑双模式**（Jupyter 风格：Shift+Enter 提交后自动渲染）、**Markdown + LaTeX 渲染**、**拖拽排序**。
 
+除普通 Markdown cell 外，还支持 **Tool cell**（⚒）：在 cell 里写文字 + 可选 JS 代码，Ctrl+Enter 让 LLM 帮你**生成工具代码**，或在浏览器里**本地真实执行**代码与测试；注册后的工具会成为全局 Registry 里的 **tools**，后续普通 cell 运行时 LLM 可以**调用这些本地工具**（function calling）。
+
 ---
 
 ## 启动
@@ -90,8 +92,57 @@ python3 -m http.server 8765
 ### 其它操作
 
 - **Shift+Enter**（在 cell 内）：运行当前 cell，焦点跳到下一个 cell；若是最后一个，自动新建一个空 cell
+- **Ctrl+Enter**（在 Tool cell 内）：运行 Tool cell（详见下文「Tool cell」）
 - **拖拽 cell 顶栏**（任意位置）：调整 cell 顺序。拖到目标 cell 的上半区 → 插到它前面；下半区 → 插到它后面。被拖的 cell 会半透明，目标位置有蓝色指示线
 - **点击顶栏的 notebook 名**：弹 prompt 改名
+
+---
+
+## Tool cell（⚒）
+
+普通 Markdown cell 之外的第二类 cell。在 **Edit ▸ New Tool Cell** 创建，顶栏有 **⚒** 徽标；保存时 `type` 一并持久化，刷新后仍是 Tool cell。
+
+**运行方式是 Ctrl+Enter**（或点 ▶，效果一样）。根据 cell 内容分两种模式：
+
+### 模式 A：纯文字 → LLM 生成代码
+
+cell 里只有文字（没有代码围栏）时，Ctrl+Enter 会把文字作为「生成一个工具」的提示发给 LLM。LLM 返回时要求给出两段围栏：
+
+````
+```tool-def
+{ "name": "...", "description": "...", "parameters": { ... JSON Schema ... } }
+```
+
+```js
+function name(...) { ... }
+```
+````
+
+生成完成后：代码以 ```` ```js ```` 围栏**追加进输入框**并自动切到渲染预览；工具（名称来自 `tool-def` 的 `name`，缺省回退到函数名）立即**注册进全局 Registry**。
+
+### 模式 B：文字 + 代码 → 本地真实执行 + LLM 评估
+
+cell 里同时有文字和代码时，Ctrl+Enter 会：
+
+1. **本地真实执行**代码：```` ```js ```` 里的函数在**独立 Web Worker** 里运行（隔离、不卡页面；死循环约 5 秒被终止报错）。
+2. 执行两个可选的验证来源：
+   - ```` ```test ```` 围栏：**断言代码**，`throw` 即失败
+   - `| input | expected |` 表格：每行一组**输入/期望输出**（input 为 JSON 数组时按位置参数展开），实际结果与期望做**容错深比较**（`1` vs `"1"` vs `1.0` 视为相等）
+3. 输出区显示真实的 **I/O 表格**（✓ pass / ✗ fail / error）、**测试块**结果、捕获到的 **console 输出**。
+4. 再把「工具说明 + 代码 + 真实执行结果 + console 日志」一起发给 LLM，得到**评估报告**显示在下方。
+5. 工具（名称取函数名，描述取文字首行）**注册进全局 Registry**——即使 LLM 评估失败也会注册（代码本身跑通了）。
+
+### 全局 Registry 与 function calling
+
+- 注册的工具持久化在 IndexedDB（`kv` 的 `tools` key），**全局有效**（不限于当前 notebook）。
+- **设置弹窗（⚙）里新增「Registered Tools」列表**：显示名称/描述，可逐条 🗑 删除。
+- 之后运行普通 Markdown cell 时，应用会把所有已注册工具按 OpenAI 兼容的 `tools` 数组传给 LLM。若 LLM 选择调用（`tool_calls`），应用就在本地**真实执行**该工具（Worker 隔离），把结果回填，最多循环 8 轮，直到 LLM 给出最终答复。
+
+示例：先建一个 Tool cell 注册 `add(a,b)`，再在 Markdown cell 里问「add(2,3)=?」，LLM 会调用本地 `add` 工具得到 5 再作答。
+
+---
+
+## Context 拼接规则
 
 ---
 
@@ -188,10 +239,11 @@ AgenticNotebook/
 ├── scripts/
 │   ├── main.js             # 入口，组装各模块 + 处理菜单动作
 │   ├── notebooks.js        # 多 notebook 索引（创建/切换/删除/导入/导出 JSON）
-│   ├── cells.js            # cell 列表渲染、运行、拖拽、预览切换
+│   ├── cells.js            # cell 列表渲染、运行、拖拽、预览切换、Tool cell 流程
 │   ├── editor.js           # CodeMirror 5 包装（含 LaTeX inline overlay）
-│   ├── llm.js              # OpenAI 兼容 SSE 流式调用
-│   ├── settings.js         # LLM 设置弹窗
+│   ├── llm.js              # OpenAI 兼容 SSE 流式调用（含 tool_calls 解析）
+│   ├── settings.js         # LLM 设置弹窗（含 Registered Tools 列表）
+│   ├── tools.js            # Tool 注册表（Registry）+ 本地执行（Web Worker）+ 解析
 │   └── storage.js          # IndexedDB 封装
 ├── vendor/                 # 全部本地化（CodeMirror / marked / highlight.js / KaTeX），零 CDN 依赖
 ├── README.md
@@ -202,9 +254,12 @@ AgenticNotebook/
 
 ---
 
-## 已知限制（v1）
+## 已知限制
 
-- 不支持代码 cell、不支持变量持久化。
+- 工具代码在**无 DOM / 无 fetch** 的隔离环境里运行（可访问 `console`、`Math` 等），不能直接操作页面。需要 DOM 时请让 LLM 把操作抽象成**纯函数**（返回数据），再在普通 cell 里让 LLM 组织 UI。
+- Worker 不可用（极老浏览器）时退化为在主线程执行，此时**死循环会卡住页面**。
+- 非 JSON 序列化的返回值（`undefined` / 函数 / `BigInt` / `Date` / `Error` / 循环引用）会被打标签兜底；超 10k 字符的输出会被截断。
+- 工具注册是**按名覆盖**：同名工具重新注册会更新（`createdAt` 保留，`updatedAt` 更新）。
 - 运行 cell 时如果同时切换 notebook，可能出现 output 写入到旧 DOM 引用的问题（罕见，刷新页面可恢复）。
 - CodeMirror 5 是经典版本，没有原生 markdown 预览，需要用 👁 按钮手动切换（运行后会自动切）。
 - LaTeX 仅识别 `$...$` 和 `$$...$$`，不支持 `\(...\)` / `\[...\]` 等其它分隔符。

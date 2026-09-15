@@ -35,12 +35,13 @@
 <script src="vendor/katex/katex.min.js"></script>
 <script src="vendor/katex/auto-render.min.js"></script>
 
-<!-- App modules — order matters: storage → editor → llm → settings → notebooks → cells → main -->
+<!-- App modules — order matters: storage → editor → llm → settings → notebooks → tools → cells → main -->
 <script src="scripts/storage.js"></script>
 <script src="scripts/editor.js"></script>
 <script src="scripts/llm.js"></script>
 <script src="scripts/settings.js"></script>
 <script src="scripts/notebooks.js"></script>
+<script src="scripts/tools.js"></script>
 <script src="scripts/cells.js"></script>
 <script src="scripts/main.js"></script>
 </head>
@@ -77,6 +78,7 @@
       <ul class="menu-items">
         <li data-action="add-below">Add Cell Below</li>
         <li data-action="add-above">Add Cell at Top</li>
+        <li data-action="add-tool-cell">New Tool Cell</li>
         <li data-action="clear-outputs">Clear All Outputs</li>
       </ul>
     </details>
@@ -121,6 +123,10 @@
         <span>Model</span>
         <input type="text" id="cfg-model" placeholder="agnes-3.0-flash" autocomplete="off" required>
       </label>
+      <div class="registered-tools-block">
+        <span class="registered-tools-title">Registered Tools</span>
+        <div id="registered-tools" class="registered-tools"><div class="tools-empty">None yet.</div></div>
+      </div>
       <div class="modal-actions">
         <button type="button" id="cfg-cancel">Cancel</button>
         <button type="submit" id="cfg-save">Save</button>
