@@ -1118,6 +1118,17 @@ input.focus();
     runBtn.title = cell.type === 'tool' ? 'Run tool cell (Ctrl+Enter)' : 'Run cell (Shift+Enter)';
     runBtn.addEventListener('click', () => onRunClick(cell.id));
 
+    // Type toggle: md ↔ tool. The cell is fully rebuilt by rerenderAll()
+    // afterwards, so the run title, ⚒ badge and Ctrl+Enter listener all pick
+    // up the new type. Content and output are preserved.
+    const typeToggleBtn = document.createElement('button');
+    typeToggleBtn.className = 'cell-btn cell-type-toggle';
+    typeToggleBtn.textContent = cell.type === 'tool' ? '📝' : '⚒';
+    typeToggleBtn.title = cell.type === 'tool'
+      ? 'Convert to Markdown cell'
+      : 'Convert to Tool cell (Ctrl+Enter runs it locally)';
+    typeToggleBtn.addEventListener('click', () => toggleCellType(cell.id));
+
     const clearOutputBtn = document.createElement('button');
     clearOutputBtn.className = 'cell-btn cell-clear-output';
     clearOutputBtn.textContent = '🧹';
@@ -1149,6 +1160,7 @@ input.focus();
     delBtn.addEventListener('click', () => deleteCell(cell.id));
 
     toolbar.appendChild(runBtn);
+    toolbar.appendChild(typeToggleBtn);
     toolbar.appendChild(toggleBtn);
     toolbar.appendChild(insertAboveBtn);
     toolbar.appendChild(insertBelowBtn);
@@ -1342,6 +1354,17 @@ input.focus();
     applyCellMode(cell);
   }
 
+  /** Flip a cell between 'md' and 'tool'. Content/output preserved; the cell
+   *  is rebuilt so the badge, run title and Ctrl+Enter wiring match the new type. */
+  function toggleCellType(id) {
+    const cell = cells.find((c) => c.id === id);
+    if (!cell) return;
+    cell.type = cell.type === 'tool' ? 'md' : 'tool';
+    cell.previewMode = false; // back to edit mode so the new type is visible
+    rerenderAll();
+    saveNotebookDebounced();
+  }
+
   // --- drag & drop reordering ----------------------------------------------
 
   let dragSourceId = null;
@@ -1520,6 +1543,7 @@ input.focus();
     exportNotebookHtml,
     exportNotebookAgent,
     toggleCellPreview,
+    toggleCellType,
     setCellPreview,
     handleCtrlEnter
   };

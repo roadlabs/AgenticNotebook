@@ -81,6 +81,7 @@ python3 -m http.server 8765
 | 图标 | 作用 |
 |---|---|
 | **▶** | 运行当前 cell（拼上下文 → 调 LLM → 流式写入输出区） |
+| **⚒ / 📝** | **切换 cell 类型**：普通 cell 显示 ⚒（点它变成 Tool cell）；Tool cell 显示 📝（点它变回普通 Markdown cell）。切换保留内容与输出，即时保存 |
 | **👁** | 切换预览/源码模式（眼睛=在源码，点变 ✏=切到预览；运行后会自动切到预览） |
 | **⏫** | 在当前 cell **上方**插入一个空白 cell 并 focus |
 | **⏬** | 在当前 cell **下方**插入一个空白 cell 并 focus |
@@ -92,7 +93,8 @@ python3 -m http.server 8765
 ### 其它操作
 
 - **Shift+Enter**（在 cell 内）：运行当前 cell，焦点跳到下一个 cell；若是最后一个，自动新建一个空 cell
-- **Ctrl+Enter**（在 Tool cell 内）：运行 Tool cell（详见下文「Tool cell」）
+- **Ctrl+Enter**（在 Tool cell 内）：运行 Tool cell（详见下文「Tool cell」；Ctrl 或 ⌘ 均可）
+- **❓ 帮助按钮**（右上角工具栏）：打开「帮助 & 快捷键」弹窗，列出所有快捷键与 Tool cell 用法
 - **拖拽 cell 顶栏**（任意位置）：调整 cell 顺序。拖到目标 cell 的上半区 → 插到它前面；下半区 → 插到它后面。被拖的 cell 会半透明，目标位置有蓝色指示线
 - **点击顶栏的 notebook 名**：弹 prompt 改名
 
@@ -100,7 +102,7 @@ python3 -m http.server 8765
 
 ## Tool cell（⚒）
 
-普通 Markdown cell 之外的第二类 cell。在 **Edit ▸ New Tool Cell** 创建，顶栏有 **⚒** 徽标；保存时 `type` 一并持久化，刷新后仍是 Tool cell。
+普通 Markdown cell 之外的第二类 cell。两种创建方式：**Edit ▸ New Tool Cell** 在末尾新建，或**hover 任意 cell 点 ⚒ 按钮**把现有 cell 转成 Tool cell（再点 📝 可转回普通 Markdown cell）。Tool cell 顶栏有 **⚒** 徽标；保存时 `type` 一并持久化，刷新后仍是 Tool cell。
 
 **运行方式是 Ctrl+Enter**（或点 ▶，效果一样）。根据 cell 内容分两种模式：
 

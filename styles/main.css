@@ -294,6 +294,34 @@ body {
   line-height: 1.4;
 }
 
+/* ---------- Help modal (shortcuts) ---------- */
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.help-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.help-table tr:last-child td { border-bottom: none; }
+
+.help-table kbd {
+  display: inline-block;
+  padding: 1px 7px;
+  background: var(--bg-root);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
 /* ---------- Registered Tools (in the Settings modal) ---------- */
 .registered-tools-block {
   margin-top: 4px;

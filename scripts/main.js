@@ -78,6 +78,16 @@
       }
     });
 
+    // Help modal
+    const helpModal = document.getElementById('help-modal');
+    const openHelp = () => helpModal.classList.remove('hidden');
+    const closeHelp = () => helpModal.classList.add('hidden');
+    document.getElementById('btn-help').addEventListener('click', openHelp);
+    document.getElementById('help-close').addEventListener('click', closeHelp);
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) closeHelp();
+    });
+
     // Inline rename: click the notebook name
     document.getElementById('current-notebook-name').addEventListener('click', renameCurrentNotebook);
 
