@@ -56,7 +56,7 @@ python3 -m http.server 8765
 | **Open…** | 弹模态对话框，列出所有已保存的 notebook（✓ 表示当前），点行切换，右边 🗑 删除 |
 | **Save** | 强制保存当前（防抖 500ms 自动保存之外的手动触发） |
 | **Import…** | 从 JSON 文件导入成一个新 notebook 并切过去 |
-| **Export ▸ as JSON / as HTML** | 导出当前 notebook；文件名 = `<notebook 名>-<时间戳>.{json,html}` |
+| **Export ▸ as JSON / as HTML / as App** | 导出当前 notebook；JSON 可回导、HTML 静态成品、App 是**对话式 agent**（详见下文）；文件名 = `<notebook 名>[-agent]-<时间戳>.{json,html}` |
 
 `Edit ▾` 菜单保留：Add Cell Below / at Top、Clear All Outputs（全局）。
 
@@ -127,8 +127,22 @@ Please respond to Cell N.
 ---
 
 ## 输出渲染
-
 输出区用 `marked` 解析 markdown（GFM、表格、任务列表、删除线），用 KaTeX 渲染行内 `$...$` 和块级 `$$...$$` 的 LaTeX，code block 用 highlight.js 上色（始终深色背景）。Markdown + LaTeX 同时在**输出区**和**输入预览模式**里都生效。
+
+---
+
+## Agent App 导出（Export ▸ as App）
+
+把当前 notebook 导成一个**可独立运行的对话式 agent**（单文件 `.html`）：
+
+- 打开后是一套聊天界面；**整个 notebook 的内容烘焙成 system prompt** 作为 agent 的背景知识，上方可折叠展示
+- 内置 OpenAI 兼容流式调用（SSE），回复实时渲染 Markdown + KaTeX + 代码高亮
+- 导出时把当前的 **Base URL / Model** 烘焙成默认值（默认 Agnes），右上角 ⚙ 可改；**API Key 只存本地浏览器**（localStorage），不进文件
+- 对话历史只在当前页面会话内有效；🗑 清空对话
+
+和主应用一样的注意点：
+- 从 `file://` 直接打开即可；若厂商 CORS 拦 `file://`，用 `python3 -m http.server` 起个服务再打开
+- 该导出文件引用了 CDN（jsdelivr）上的 marked / highlight.js / KaTeX，需要联网加载（本来调 LLM 也要联网）；另有「Export as HTML」是零 JS 的纯静态版本，完全离线可看
 
 ---
 
