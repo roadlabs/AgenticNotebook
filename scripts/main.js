@@ -88,6 +88,18 @@
       if (e.target === helpModal) closeHelp();
     });
 
+    // Esc closes the help / open-notebook modals (settings modal has its own
+    // Esc handling in settings.js). cells.js's capture-phase keydown ignores
+    // keys while a modal is open, so no conflict.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const helpOpen = !helpModal.classList.contains('hidden');
+      const openModal = document.getElementById('open-modal');
+      const openOpen = openModal && !openModal.classList.contains('hidden');
+      if (helpOpen) closeHelp();
+      else if (openOpen) hideOpenModal();
+    });
+
     // Inline rename: click the notebook name
     document.getElementById('current-notebook-name').addEventListener('click', renameCurrentNotebook);
 

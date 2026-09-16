@@ -14,11 +14,25 @@ window.Anb = window.Anb || {};
   let saveNotebookDebounced = null;
   let cells = [];
 
+  // --- Jupyter-style command mode state ------------------------------------
+  let commandMode = false;
+  let selectedCellId = null;
+  let doubleTapKey = null;
+  let doubleTapAt = 0;
+  const DOUBLE_TAP_MS = 300;
+  let cmdChipEl = null;
+
   // --- public API ----------------------------------------------------------
 
   function init(notebookElement, debouncedSave) {
     notebookEl = notebookElement;
     saveNotebookDebounced = debouncedSave;
+    // Capture phase is required: CodeMirror 5 calls stopPropagation() on the
+    // keys it handles (Esc → singleSelection, letters, arrows), so a bubbling
+    // listener would never see them.
+    document.addEventListener('keydown', onDocumentKeydown, true);
+    document.addEventListener('focusin', onDocumentFocusIn);
+    document.addEventListener('click', onDocumentClick);
   }
 
   function getCells() {
@@ -26,6 +40,12 @@ window.Anb = window.Anb || {};
   }
 
   function render(cellsData) {
+    // A fresh render resets command-mode selection (notebook switch, new,
+    // import, rerender of the whole list). rerenderAll() restores it after.
+    selectedCellId = null;
+    commandMode = false;
+    updateCommandModeIndicator();
+
     cells = (cellsData || []).map((c) => ({
       id: c.id || newId(),
       type: c.type === 'tool' ? 'tool' : 'md',
@@ -67,7 +87,15 @@ window.Anb = window.Anb || {};
     rerenderAll();
     saveNotebookDebounced();
 
-    setTimeout(() => editor.focus(newCell.cm), 50);
+    // rerenderAll() rebuilds the cells array with fresh objects, so the
+    // original newCell is orphaned (its .cm stays null). Look up the cell
+    // by id in the rebuilt array before focusing. (Pre-existing bug: the
+    // old code called editor.focus(newCell.cm) on the orphan — cm was null
+    // and the new cell never actually got focus.)
+    setTimeout(() => {
+      const rendered = cells.find((c) => c.id === newCell.id);
+      if (rendered && rendered.cm) editor.focus(rendered.cm);
+    }, 50);
     return newCell;
   }
 
@@ -81,6 +109,11 @@ window.Anb = window.Anb || {};
     if (!confirm('Delete this cell?')) return;
 
     cells.splice(idx, 1);
+    // Keep the command-mode selection on a neighbour (cells is never empty —
+    // the length<=1 check above already bailed out).
+    if (selectedCellId === id) {
+      selectedCellId = cells[Math.min(idx, cells.length - 1)].id;
+    }
     rerenderAll();
     saveNotebookDebounced();
   }
@@ -1263,8 +1296,18 @@ input.focus();
       output: c.output,
       previewMode: c.previewMode
     }));
+    // Rebuilding the DOM wipes the selection — snapshot it and restore it
+    // when the selected id survives (M/Y toggle, drag reorder, delete).
+    const savedSel = selectedCellId;
+    const savedMode = commandMode;
     notebookEl.innerHTML = '';
     render(dataSnapshot);
+    if (savedMode && savedSel && cells.some((c) => c.id === savedSel)) {
+      selectedCellId = savedSel;
+      commandMode = true;
+      applySelectedClass();
+      updateCommandModeIndicator();
+    }
   }
 
   function refreshLabel(cell) {
@@ -1310,6 +1353,234 @@ input.focus();
       setCellPreview(id, true);
       addCell('below', idx);
     }
+  }
+
+  // --- Jupyter-style command mode ------------------------------------------
+
+  function onDocumentKeydown(e) {
+    if (e.isComposing) return;
+
+    // A visible modal owns the keyboard — it handles its own Esc close
+    // (main.js / settings.js), and command-mode shortcuts must not fire.
+    if (document.querySelector('.modal:not(.hidden)')) return;
+
+    // Don't hijack standalone form fields (settings inputs etc.). The active
+    // element inside CodeMirror is a textarea too, so only bail when it's
+    // NOT inside a .CodeMirror.
+    const target = e.target;
+    if (
+      target &&
+      target.tagName &&
+      /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) &&
+      !isCmFocused()
+    ) {
+      return;
+    }
+
+    if (isCmFocused()) {
+      // Editor focused: only Esc enters command mode. (Capture phase, because
+      // CM5 stopPropagation() on handled keys would otherwise swallow it.)
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        enterCommandMode();
+      }
+      return;
+    }
+
+    if (!commandMode) return;
+
+    // Command mode active.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    // Any command other than a double-tap key aborts a pending tap, so
+    // "d → j → d" can't accidentally delete.
+    if (!(e.key === 'd' || e.key === 'D' || e.key === 'o' || e.key === 'O')) {
+      doubleTapKey = null;
+    }
+
+    let handled = true;
+    switch (e.key) {
+      case 'Enter':
+      case 'Escape':
+        enterEditModeOnSelected();
+        break;
+      case 'j':
+      case 'J':
+      case 'ArrowDown':
+        moveSelection(1);
+        break;
+      case 'k':
+      case 'K':
+      case 'ArrowUp':
+        moveSelection(-1);
+        break;
+      case 'a':
+      case 'A':
+        insertCellAboveSelected();
+        break;
+      case 'b':
+      case 'B':
+        insertCellBelowSelected();
+        break;
+      case 'm':
+      case 'M':
+        setSelectedCellType('md');
+        break;
+      case 'y':
+      case 'Y':
+        setSelectedCellType('tool');
+        break;
+      case 'd':
+      case 'D':
+        handleDoubleTap('d', deleteSelectedCell);
+        break;
+      case 'o':
+      case 'O':
+        handleDoubleTap('o', clearSelectedOutput);
+        break;
+      default:
+        handled = false;
+        // Any other key aborts a pending double-tap.
+        doubleTapKey = null;
+    }
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+
+  function isCmFocused() {
+    const el = document.activeElement;
+    return !!(el && el.closest && el.closest('.CodeMirror'));
+  }
+
+  function enterCommandMode() {
+    const el = document.activeElement;
+    const cellEl = el && el.closest ? el.closest('.cell') : null;
+    if (!cellEl) return;
+    const cell = cells.find((c) => c.id === cellEl.dataset.cellId);
+    if (!cell) return;
+    commandMode = true;
+    selectedCellId = cell.id;
+    if (cell.cm) cell.cm.getInputField().blur();
+    applySelectedClass();
+    updateCommandModeIndicator();
+  }
+
+  function enterEditModeOnSelected() {
+    const cell = selectedCellId ? cells.find((c) => c.id === selectedCellId) : null;
+    exitCommandMode();
+    if (!cell) return;
+    if (cell.previewMode) setCellPreview(cell.id, false);
+    if (cell.cm) editor.focus(cell.cm);
+  }
+
+  function exitCommandMode() {
+    commandMode = false;
+    applySelectedClass();
+    updateCommandModeIndicator();
+  }
+
+  function moveSelection(dir) {
+    if (cells.length === 0) return;
+    let idx = cells.findIndex((c) => c.id === selectedCellId);
+    if (idx < 0) idx = 0;
+    idx = Math.max(0, Math.min(cells.length - 1, idx + dir)); // clamp, no wrap
+    selectedCellId = cells[idx].id;
+    applySelectedClass();
+    updateCommandModeIndicator();
+    if (cells[idx].cellEl) cells[idx].cellEl.scrollIntoView({ block: 'nearest' });
+  }
+
+  function insertCellAboveSelected() {
+    const idx = cells.findIndex((c) => c.id === selectedCellId);
+    exitCommandMode();
+    addCell('above', idx >= 0 ? idx : 0);
+  }
+
+  function insertCellBelowSelected() {
+    const idx = cells.findIndex((c) => c.id === selectedCellId);
+    exitCommandMode();
+    // addCell('below', idx) inserts at idx+1 — exactly below the selection.
+    addCell('below', idx >= 0 ? idx : -1);
+  }
+
+  function setSelectedCellType(type) {
+    const cell = cells.find((c) => c.id === selectedCellId);
+    if (!cell || cell.type === type) return;
+    // toggleCellType flips md↔tool and rerenders; selection is restored.
+    toggleCellType(cell.id);
+  }
+
+  function deleteSelectedCell() {
+    if (selectedCellId) deleteCell(selectedCellId);
+  }
+
+  function clearSelectedOutput() {
+    if (selectedCellId) clearCellOutput(selectedCellId);
+  }
+
+  function handleDoubleTap(key, fn) {
+    const now = Date.now();
+    if (doubleTapKey === key && now - doubleTapAt <= DOUBLE_TAP_MS) {
+      doubleTapKey = null;
+      doubleTapAt = 0;
+      fn();
+      return;
+    }
+    doubleTapKey = key;
+    doubleTapAt = now;
+  }
+
+  function applySelectedClass() {
+    for (const c of cells) {
+      if (c.cellEl) {
+        c.cellEl.classList.toggle('cell-selected', commandMode && c.id === selectedCellId);
+      }
+    }
+  }
+
+  function updateCommandModeIndicator() {
+    if (!cmdChipEl) {
+      cmdChipEl = document.createElement('div');
+      cmdChipEl.id = 'cmd-mode-chip';
+      document.body.appendChild(cmdChipEl);
+    }
+    if (commandMode) {
+      const idx = cells.findIndex((c) => c.id === selectedCellId);
+      cmdChipEl.textContent = `⌨ 命令模式 · Cell ${idx >= 0 ? idx + 1 : '—'}`;
+      cmdChipEl.classList.add('visible');
+    } else {
+      cmdChipEl.classList.remove('visible');
+    }
+  }
+
+  function onDocumentFocusIn(e) {
+    if (!commandMode) return;
+    if (e.target && e.target.closest && e.target.closest('.CodeMirror')) {
+      exitCommandMode();
+    }
+  }
+
+  function onDocumentClick(e) {
+    const target = e.target;
+    if (!target || !target.closest) return;
+    // These areas have their own click behaviors — never steal them.
+    if (
+      target.closest(
+        '.modal, .menu, .cell-toolbar, .cell-btn, .icon-btn, .CodeMirror, .cell-preview, .cell-output'
+      )
+    ) {
+      return;
+    }
+    const cellEl = target.closest('.cell');
+    if (!cellEl) return;
+    const cell = cells.find((c) => c.id === cellEl.dataset.cellId);
+    if (!cell) return;
+    if (commandMode) exitCommandMode();
+    if (cell.previewMode) setCellPreview(cell.id, false);
+    if (cell.cm) editor.focus(cell.cm);
   }
 
   // --- preview / edit mode toggle ------------------------------------------
@@ -1428,7 +1699,9 @@ input.focus();
     saveNotebookDebounced();
 
     const moved = cells.find((c) => c.id === dragSourceId);
-    if (moved && moved.cm) {
+    // In command mode keep the selection ring (rerenderAll restored it);
+    // only drop into edit mode when the user was already editing.
+    if (moved && moved.cm && !commandMode) {
       setTimeout(() => editor.focus(moved.cm), 50);
     }
   }

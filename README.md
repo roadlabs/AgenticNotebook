@@ -100,6 +100,28 @@ Hovering over a cell reveals a row of small icon buttons on the right of its top
 
 ---
 
+## Command Mode (Jupyter-style shortcuts)
+
+The app supports Jupyter's **command mode**: press **Esc** inside any cell to enter it (the current cell is highlighted and its editor loses focus), and press **Esc** or **Enter** again to return to editing. Common shortcuts while in command mode:
+
+| Shortcut | What it does |
+|---|---|
+| **Enter** / **Esc** | Edit the selected cell (Enter also leaves render-preview mode) |
+| **J** / **K** (or **↓** / **↑**) | Move the selection up / down |
+| **A** / **B** | Insert a new cell above / below the selection and start editing it |
+| **D D** | Press **D** twice quickly to delete the selected cell |
+| **O O** | Press **O** twice quickly to clear the selected cell's output |
+| **M** / **Y** | Convert the selected cell to a Markdown / Tool cell (content and output preserved) |
+
+Two small differences from Jupyter:
+
+- **J/K do not wrap**: at the first or last cell the selection stays put instead of looping to the other end.
+- **A/B drop straight into edit mode**: Jupyter stays in command mode; this app follows its own ⏫/⏬ toolbar convention and focuses the newly inserted cell immediately.
+
+Clicking a cell's input or label area also enters edit mode directly (Esc is the only way into command mode).
+
+---
+
 ## Tool Cell (`</>`)
 
 A second cell type alongside normal Markdown cells. Two ways to create one: **Edit ▸ New Tool Cell** creates one at the end, or **hover any cell and click the `</>` button** to convert an existing cell into a Tool cell (click `M` to convert it back). A Tool cell shows a **`</>`** badge in its top bar (a code icon hinting that executable JS lives here); normal Markdown cells carry no type marker (following Jupyter's convention: code cells get `In[n]` prompts/line numbers, markdown cells stay quiet). The `type` is persisted on save, so a Tool cell stays a Tool cell after refresh.

@@ -100,6 +100,28 @@ python3 -m http.server 8765
 
 ---
 
+## 命令模式（Jupyter 风格快捷键）
+
+本应用支持 Jupyter Notebook 的**命令模式**：在任意 cell 内按 **Esc** 进入命令模式（当前 cell 高亮选中、编辑器失焦），再按 **Esc** 或 **Enter** 回到编辑。命令模式下常用快捷键：
+
+| 快捷键 | 作用 |
+|---|---|
+| **Enter** / **Esc** | 编辑当前选中的 cell（Enter 会自动退出渲染预览） |
+| **J** / **K**（或 **↓** / **↑**） | 选中上 / 下一个 cell |
+| **A** / **B** | 在选中 cell 的上方 / 下方插入新 cell 并进入编辑 |
+| **D D** | 快速连按两次，删除选中的 cell |
+| **O O** | 快速连按两次，清空选中 cell 的输出 |
+| **M** / **Y** | 把选中 cell 转为普通 Markdown / Tool cell（内容与输出保留） |
+
+与 Jupyter 的两处小差异：
+
+- **J/K 不循环**：选中到第一个或最后一个 cell 时停在原地，不会跳回另一端。
+- **A/B 插入后直接进入编辑**：Jupyter 会留在命令模式，本应用沿用工具栏 ⏫/⏬ 的习惯，插入新 cell 后立即聚焦新 cell 的编辑器。
+
+鼠标点击 cell 的输入区或顶栏标签也会直接进入编辑模式（命令模式的唯一入口是 Esc）。
+
+---
+
 ## Tool cell（`</>`）
 
 普通 Markdown cell 之外的第二类 cell。两种创建方式：**Edit ▸ New Tool Cell** 在末尾新建，或**hover 任意 cell 点 `</>` 按钮**把现有 cell 转成 Tool cell（再点 `M` 可转回普通 Markdown cell）。Tool cell 顶栏有 **`</>`** 徽标（代码图标，暗示里面是可执行 JS）；普通 Markdown cell 不加类型标记（沿用 Jupyter 的惯例：代码 cell 有 `In[n]` 提示符/行号，markdown cell 更安静）。保存时 `type` 一并持久化，刷新后仍是 Tool cell。

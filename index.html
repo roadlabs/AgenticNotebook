@@ -104,7 +104,14 @@
       <tbody>
         <tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>运行当前 cell，跳到下一个（末格自动新建）</td></tr>
         <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd></td><td>运行 Tool cell（<code>&lt;/&gt;</code>，Ctrl 或 Cmd 都可）</td></tr>
-        <tr><td><kbd>Esc</kbd></td><td>关闭弹出的 modal</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>关闭弹出的 modal；在 cell 内按 Esc 进入命令模式，再按一次回到编辑</td></tr>
+        <tr><td colspan="2" class="help-sep">命令模式（按 Esc 进入：cell 高亮选中、编辑器失焦）</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>编辑当前选中的 cell（自动退出渲染预览）</td></tr>
+        <tr><td><kbd>J</kbd> / <kbd>K</kbd>（或 <kbd>↓</kbd> / <kbd>↑</kbd>）</td><td>选中上 / 下一个 cell（到首尾不循环）</td></tr>
+        <tr><td><kbd>A</kbd> / <kbd>B</kbd></td><td>在选中 cell 的上方 / 下方插入新 cell，并进入编辑</td></tr>
+        <tr><td><kbd>D</kbd> <kbd>D</kbd></td><td>快速连按两次，删除选中的 cell</td></tr>
+        <tr><td><kbd>O</kbd> <kbd>O</kbd></td><td>快速连按两次，清空选中 cell 的输出</td></tr>
+        <tr><td><kbd>M</kbd> / <kbd>Y</kbd></td><td>转为普通 Markdown / Tool cell（内容与输出保留）</td></tr>
         <tr><td>👁 / ✏</td><td>在 cell 内切换 渲染预览 ↔ 源码编辑</td></tr>
         <tr><td><code>&lt;/&gt;</code> / <code>M</code></td><td>把 cell 在 Tool 与普通 Markdown 之间切换（hover 工具栏）</td></tr>
         <tr><td>拖拽顶栏</td><td>调整 cell 顺序（拖到目标上半区=插前面，下半区=插后面）</td></tr>

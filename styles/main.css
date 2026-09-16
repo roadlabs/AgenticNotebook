@@ -309,6 +309,17 @@ body {
 
 .help-table tr:last-child td { border-bottom: none; }
 
+.help-table td.help-sep {
+  border-bottom: none;
+  padding-top: 12px;
+  padding-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+
 .help-table kbd {
   display: inline-block;
   padding: 1px 7px;

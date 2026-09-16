@@ -21,6 +21,39 @@
 
 .cell.cell-error { border-color: var(--error); }
 
+/* ---------- Command-mode selection ring ---------- */
+.cell.cell-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.28);
+}
+
+html[data-theme="light"] .cell.cell-selected {
+  box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.22);
+}
+
+#cmd-mode-chip {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2000;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+#cmd-mode-chip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* ---------- Top bar ---------- */
 .cell-topbar {
   display: flex;
