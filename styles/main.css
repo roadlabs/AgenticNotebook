@@ -251,6 +251,22 @@ body {
   border-color: var(--accent);
 }
 
+/* Inline checkbox row (built-in notebook tools toggle) — override the full
+   width block input rules above so the box stays compact next to its label. */
+.modal-content label.cfg-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal-content label.cfg-inline > span {
+  display: inline;
+  margin: 0;
+}
+.modal-content label.cfg-inline input[type="checkbox"] {
+  width: auto;
+  flex: none;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

@@ -164,6 +164,23 @@ cell 里同时有文字和代码时，Ctrl+Enter 会：
 
 示例：先建一个 Tool cell 注册 `add(a,b)`，再在 Markdown cell 里问「add(2,3)=?」，LLM 会调用本地 `add` 工具得到 5 再作答。
 
+### 内置 notebook 工具（把单元格操作开放给 LLM）
+
+除了注册工具，运行普通 Markdown cell 时还会附带六个 **内置** 工具（前缀 `notebook.`），让 LLM 能直接操作笔记本本身：
+
+| 工具 | 作用 |
+|---|---|
+| `notebook.list_cells` | 列出所有 cell：1-based 索引、id、类型、首行、长度、是否有输出 |
+| `notebook.add_cell` | 插入 cell（`position`：top / bottom / before / after，可带 `content` / `type`） |
+| `notebook.delete_cell` | 按索引删除 cell（拒绝删最后一格 / 正在运行的 cell） |
+| `notebook.move_cell` | 把 `index` 处的 cell 移动到最终位置 `to` |
+| `notebook.get_cell` | 读取某个 cell 的完整内容（+ 输出预览） |
+| `notebook.clear_cell_output` | 清空某 cell 的输出（拒绝清空正在运行的 cell） |
+
+- 单元格索引均为 **1-based**，与上下文里的 `[Cell N]` 标签一致。
+- 内置工具在**主线程**执行（直接操作笔记本 DOM）；Tool cell 注册的工具仍走 Web Worker。
+- **开关**：⚙ 设置弹窗里有「Allow built-in notebook tools」勾选框（默认勾选）。取消勾选后 `notebook.*` 工具不再发送，注册工具不受影响。`notebook.` 前缀为内置保留，冲突的注册工具会被忽略并在控制台警告。
+
 ---
 
 ## Context 拼接规则

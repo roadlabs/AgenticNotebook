@@ -164,6 +164,23 @@ When the cell has both text and code, Ctrl+Enter will:
 
 Example: create a Tool cell that registers `add(a,b)`, then ask in a Markdown cell "add(2,3)=?" — the LLM calls the local `add` tool, gets 5, and answers.
 
+### Built-in notebook tools (notebook cell operations for the LLM)
+
+Besides registry tools, running an ordinary Markdown cell also offers six **built-in** tools with the `notebook.` prefix, so the LLM can operate the notebook itself:
+
+| Tool | What it does |
+|---|---|
+| `notebook.list_cells` | List cells: 1-based index, id, type, first line, content length, has-output |
+| `notebook.add_cell` | Insert a cell (`position`: top / bottom / before / after, optional `content` / `type`) |
+| `notebook.delete_cell` | Delete the cell at an index (refuses the last cell / the currently running cell) |
+| `notebook.move_cell` | Move the cell at `index` to a final position `to` |
+| `notebook.get_cell` | Read a cell's full content (+ output preview) |
+| `notebook.clear_cell_output` | Clear a cell's output (refuses the currently running cell) |
+
+- Cell indexes are **1-based**, matching the `[Cell N]` labels in the context.
+- Built-ins run on the **main thread** (they mutate the notebook DOM directly); Tool-cell registry tools still run in a Web Worker.
+- **Toggle**: the ⚙ settings modal has an *Allow built-in notebook tools* checkbox (on by default). Unchecking it stops the `notebook.*` tools from being sent; registry tools are unaffected. The `notebook.` prefix is reserved — a registered tool colliding with it is ignored with a console warning.
+
 ---
 
 ## Context Concatenation Rules

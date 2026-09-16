@@ -8,7 +8,10 @@ window.Anb = window.Anb || {};
   const DEFAULTS = {
     baseUrl: 'https://api.agnes-ai.cn/v1/chat/completions',
     apiKey: '',
-    model: 'agnes-3.0-flash'
+    model: 'agnes-3.0-flash',
+    // Whether built-in notebook.* tools are offered to the LLM when running
+    // ordinary md cells. Opt-out via the ⚙ settings modal.
+    allowNotebookTools: true
   };
 
   async function load() {
@@ -50,6 +53,7 @@ window.Anb = window.Anb || {};
     const cancelBtn = document.getElementById('cfg-cancel');
     const settingsBtn = document.getElementById('btn-settings');
     const toolsList = document.getElementById('registered-tools');
+    const notebookToolsCb = document.getElementById('cfg-allow-notebook-tools');
 
     function escapeHtml(s) {
       return String(s)
@@ -106,6 +110,7 @@ window.Anb = window.Anb || {};
       baseUrlInput.value = s.baseUrl;
       apiKeyInput.value = s.apiKey;
       modelInput.value = s.model;
+      if (notebookToolsCb) notebookToolsCb.checked = s.allowNotebookTools !== false;
       await renderTools();
       modal.classList.remove('hidden');
       setTimeout(() => baseUrlInput.focus(), 50);
@@ -133,7 +138,8 @@ window.Anb = window.Anb || {};
       const settings = {
         baseUrl: baseUrlInput.value.trim(),
         apiKey: apiKeyInput.value.trim(),
-        model: modelInput.value.trim()
+        model: modelInput.value.trim(),
+        allowNotebookTools: notebookToolsCb ? notebookToolsCb.checked : true
       };
       await save(settings);
       if (typeof onSave === 'function') onSave(settings);

@@ -92,21 +92,31 @@ window.Anb = window.Anb || {};
     // by id in the rebuilt array before focusing. (Pre-existing bug: the
     // old code called editor.focus(newCell.cm) on the orphan — cm was null
     // and the new cell never actually got focus.)
-    setTimeout(() => {
-      const rendered = cells.find((c) => c.id === newCell.id);
-      if (rendered && rendered.cm) editor.focus(rendered.cm);
-    }, 50);
+    // options.focus === false lets tools add cells in the background without
+    // stealing focus from the editor.
+    if (options.focus !== false) {
+      setTimeout(() => {
+        const rendered = cells.find((c) => c.id === newCell.id);
+        if (rendered && rendered.cm) editor.focus(rendered.cm);
+      }, 50);
+    }
     return newCell;
   }
 
-  function deleteCell(id) {
+  function deleteCell(id, options = {}) {
     if (cells.length <= 1) {
+      // Silent mode (built-in tool) reports via thrown Error → {__error}
+      // instead of a blocking alert/confirm the LLM can't answer.
+      if (options.silent) throw new Error('Cannot delete the last cell.');
       alert('Cannot delete the last cell.');
       return;
     }
     const idx = cells.findIndex((c) => c.id === id);
-    if (idx < 0) return;
-    if (!confirm('Delete this cell?')) return;
+    if (idx < 0) {
+      if (options.silent) throw new Error('Cell not found.');
+      return;
+    }
+    if (!options.silent && !confirm('Delete this cell?')) return;
 
     cells.splice(idx, 1);
     // Keep the command-mode selection on a neighbour (cells is never empty —
@@ -207,21 +217,40 @@ Respond only to the current cell, using prior cells as background.`;
         clearTimeout(renderTimer);
         renderTimer = null;
       }
-      cell.output = finalText;
-      cell.outputEl.innerHTML = renderMarkdown(finalText);
-      cell.status = 'idle';
-      cell.runBtn.disabled = false;
-      cell.cellEl.classList.remove('cell-running');
+      // A built-in notebook tool may have triggered rerenderAll() mid-stream,
+      // which rebuilds the cells array with fresh objects — the captured `cell`
+      // is orphaned then. Resolve the live cell by id (safe no-op if gone).
+      const liveCell = cells.find((c) => c.id === id);
+      if (!liveCell) return;
+      liveCell.output = finalText;
+      liveCell.outputEl.innerHTML = renderMarkdown(finalText);
+      liveCell.status = 'idle';
+      liveCell.runBtn.disabled = false;
+      liveCell.cellEl.classList.remove('cell-running');
       saveNotebookDebounced();
     }
 
-    const tools = await Anb.tools.toApiTools();
+    // Merge the built-in notebook tools (opt-out via ⚙ settings) with the
+    // registry tools from Tool cells. The `notebook.` prefix is reserved for
+    // built-ins — a registry tool colliding with it is skipped with a warning.
+    const allowNotebook = settings.allowNotebookTools !== false;
+    const registryTools = await Anb.tools.toApiTools();
+    const tools = allowNotebook ? [...BUILTIN_NOTEBOOK_TOOLS] : [];
+    for (const t of registryTools) {
+      const name = t && t.function && t.function.name;
+      if (allowNotebook && name && name.startsWith('notebook.')) {
+        console.warn(`registry tool "${name}" conflicts with the reserved notebook. prefix — ignoring it`);
+        continue;
+      }
+      tools.push(t);
+    }
 
     await handleToolCallLoop({
       cell,
       settings,
       messages,
       tools,
+      runningCellId: id,
       scheduleRender,
       appendOutputHtml,
       finalize
@@ -232,7 +261,7 @@ Respond only to the current cell, using prior cells as background.`;
   // Function-calling loop for md cells (uses the global tool registry)
   // ------------------------------------------------------------------
 
-  async function handleToolCallLoop({ cell, settings, messages, tools, scheduleRender, appendOutputHtml, finalize }) {
+  async function handleToolCallLoop({ cell, settings, messages, tools, runningCellId, scheduleRender, appendOutputHtml, finalize }) {
     let accumulated = '';
     const MAX_ITER = 8;
 
@@ -282,7 +311,12 @@ Respond only to the current cell, using prior cells as background.`;
           } catch {
             args = {};
           }
-          result = await Anb.tools.execute(tc.name, args);
+          // Built-in notebook tools run on the main thread (Anb.tools.execute
+          // isolates code in a Web Worker that cannot reach the notebook DOM);
+          // registry tools keep using the worker path.
+          result = tc.name.startsWith('notebook.')
+            ? await runBuiltinNotebookTool(tc.name, args, runningCellId)
+            : await Anb.tools.execute(tc.name, args);
           resultStr = Anb.tools.safeSerialize(result);
         } catch (err) {
           resultStr = { __error: String((err && err.message) || err) };
@@ -299,6 +333,235 @@ Respond only to the current cell, using prior cells as background.`;
 
     appendOutputHtml('<div class="output-error">⚠ Stopped after 8 tool-call iterations.</div>');
     finalize(accumulated);
+  }
+
+  // ------------------------------------------------------------------
+  // Built-in notebook tools — notebook cell operations exposed to the LLM
+  // ------------------------------------------------------------------
+
+  // Cell addressing is 1-based, matching the "[Cell N]" context labels.
+  const BUILTIN_NOTEBOOK_TOOLS = [
+    {
+      type: 'function',
+      function: {
+        name: 'notebook.list_cells',
+        description: 'List the notebook cells: 1-based index, id, type, first line and content length, and whether each has output.',
+        parameters: { type: 'object', properties: {} }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'notebook.add_cell',
+        description: 'Insert a new cell. position "top"/"bottom" insert at the ends; "before"/"after" require a 1-based index.',
+        parameters: {
+          type: 'object',
+          properties: {
+            position: { type: 'string', enum: ['top', 'bottom', 'before', 'after'], description: 'Where to insert the new cell.' },
+            index: { type: 'integer', minimum: 1, description: '1-based index of the reference cell (required when position is "before" or "after").' },
+            content: { type: 'string', description: 'Initial markdown source for the new cell.' },
+            type: { type: 'string', enum: ['md', 'tool'], description: 'Cell type: "md" (markdown) or "tool" (Tool cell).' }
+          }
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'notebook.delete_cell',
+        description: 'Delete the cell at a 1-based index. Cannot delete the last cell or the cell that is currently running.',
+        parameters: {
+          type: 'object',
+          properties: {
+            index: { type: 'integer', minimum: 1, description: '1-based index of the cell to delete.' }
+          },
+          required: ['index']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'notebook.move_cell',
+        description: 'Move the cell at a 1-based index to a new 1-based position — the final index it should occupy.',
+        parameters: {
+          type: 'object',
+          properties: {
+            index: { type: 'integer', minimum: 1, description: '1-based index of the cell to move.' },
+            to: { type: 'integer', minimum: 1, description: '1-based index the cell should end up at.' }
+          },
+          required: ['index', 'to']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'notebook.get_cell',
+        description: 'Read the full content of the cell at a 1-based index, plus a preview of its output if any.',
+        parameters: {
+          type: 'object',
+          properties: {
+            index: { type: 'integer', minimum: 1, description: '1-based index of the cell to read.' }
+          },
+          required: ['index']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'notebook.clear_cell_output',
+        description: 'Clear the output of the cell at a 1-based index. Cannot clear the output of the cell that is currently running.',
+        parameters: {
+          type: 'object',
+          properties: {
+            index: { type: 'integer', minimum: 1, description: '1-based index of the cell whose output to clear.' }
+          },
+          required: ['index']
+        }
+      }
+    }
+  ];
+
+  // Convert a 1-based user-facing cell index to a 0-based array index.
+  // Throws on non-integer / out-of-range values so the loop's try/catch
+  // surfaces a {__error} tool result.
+  function toIndex(v) {
+    if (!Number.isInteger(v)) {
+      throw new Error(`invalid cell index "${v}" — expected a 1-based integer`);
+    }
+    if (v < 1 || v > cells.length) {
+      throw new Error(`cell index ${v} out of range (1..${cells.length})`);
+    }
+    return v - 1;
+  }
+
+  function previewOf(text, n) {
+    const s = String(text == null ? '' : text);
+    return s.length > n ? s.slice(0, n) + '…' : s;
+  }
+
+  // Dispatch a notebook.* built-in tool on the main thread (see handleToolCallLoop
+  // for why these can't go through Anb.tools.execute's Web Worker). Throws on
+  // invalid input or illegal state; the loop's try/catch turns that into {__error}.
+  async function runBuiltinNotebookTool(name, args, runningCellId) {
+    const a = args || {};
+    switch (name) {
+      case 'notebook.list_cells': {
+        const list = cells.map((c, k) => ({
+          index: k + 1,
+          id: c.id,
+          type: c.type,
+          preview: previewOf(c.content.split('\n')[0], 120),
+          contentLength: c.content.length,
+          hasOutput: !!c.output
+        }));
+        return { count: cells.length, cells: list };
+      }
+
+      case 'notebook.add_cell': {
+        const position = a.position || 'bottom';
+        if (a.type !== undefined && a.type !== 'md' && a.type !== 'tool') {
+          throw new Error(`invalid type "${a.type}" — must be "md" or "tool"`);
+        }
+        const content = String(a.content == null ? '' : a.content);
+        let insertAt;
+        if (position === 'top') {
+          insertAt = 0;
+        } else if (position === 'bottom') {
+          insertAt = cells.length;
+        } else if (position === 'before' || position === 'after') {
+          if (a.index === undefined) {
+            throw new Error(`position "${position}" requires a 1-based "index"`);
+          }
+          const idx = toIndex(a.index);
+          insertAt = position === 'before' ? idx : idx + 1;
+        } else {
+          throw new Error(`invalid position "${position}" — must be "top", "bottom", "before" or "after"`);
+        }
+        // Splice directly (exact absolute position, no focus steal) instead of
+        // addCell(), whose position/atIndex math can't express insertAt === 0.
+        const newCell = createBlankCell(a.type);
+        newCell.content = content;
+        cells.splice(insertAt, 0, newCell);
+        rerenderAll();
+        saveNotebookDebounced();
+        reassertRunningState(runningCellId);
+        return { index: insertAt + 1, id: newCell.id };
+      }
+
+      case 'notebook.delete_cell': {
+        const idx = toIndex(a.index);
+        const target = cells[idx];
+        if (cells.length <= 1) throw new Error('Cannot delete the last cell.');
+        if (target.id === runningCellId) {
+          throw new Error('Cannot delete the cell that is currently running.');
+        }
+        deleteCell(target.id, { silent: true });
+        reassertRunningState(runningCellId);
+        return { deleted: true, id: target.id };
+      }
+
+      case 'notebook.move_cell': {
+        const from = toIndex(a.index);
+        const to = toIndex(a.to);
+        if (from === to) return { moved: true, from: a.index, to: a.to };
+        reorderCell(from, to);
+        rerenderAll();
+        saveNotebookDebounced();
+        reassertRunningState(runningCellId);
+        return { moved: true, from: a.index, to: a.to };
+      }
+
+      case 'notebook.get_cell': {
+        const idx = toIndex(a.index);
+        const c = cells[idx];
+        return {
+          index: a.index,
+          id: c.id,
+          type: c.type,
+          content: c.content,
+          outputPreview: c.output ? previewOf(c.output, 300) : null
+        };
+      }
+
+      case 'notebook.clear_cell_output': {
+        const idx = toIndex(a.index);
+        const target = cells[idx];
+        if (target.id === runningCellId) {
+          throw new Error('Cannot clear the output of the cell that is currently running.');
+        }
+        clearCellOutput(target.id);
+        reassertRunningState(runningCellId);
+        return { cleared: true };
+      }
+
+      default:
+        throw new Error(`unknown built-in notebook tool "${name}"`);
+    }
+  }
+
+  // Move the cell at fromIdx to absolute position toIdx (both 0-based) in the
+  // cells array. Shared by drag-and-drop and the notebook.move_cell tool.
+  function reorderCell(fromIdx, toIdx) {
+    if (fromIdx < 0 || fromIdx >= cells.length) return;
+    if (toIdx < 0 || toIdx >= cells.length) return;
+    if (fromIdx === toIdx) return;
+    const [source] = cells.splice(fromIdx, 1);
+    cells.splice(toIdx, 0, source);
+  }
+
+  // rerenderAll() rebuilds every cell with status 'idle'. After a built-in tool
+  // mutates the notebook mid-stream, re-mark the running cell so the "Running…"
+  // state isn't lost until the loop finalizes.
+  function reassertRunningState(runningCellId) {
+    if (!runningCellId) return;
+    const live = cells.find((c) => c.id === runningCellId);
+    if (!live) return;
+    live.status = 'running';
+    if (live.runBtn) live.runBtn.disabled = true;
+    if (live.cellEl) live.cellEl.classList.add('cell-running');
   }
 
   // ------------------------------------------------------------------
@@ -1689,16 +1952,20 @@ input.focus();
     const rect = targetCell.cellEl.getBoundingClientRect();
     const isAbove = e.clientY < rect.top + rect.height / 2;
 
-    const [source] = cells.splice(sourceIdx, 1);
-    let insertAt = cells.findIndex((c) => c.id === targetId);
-    if (!isAbove) insertAt += 1;
-    cells.splice(insertAt, 0, source);
+    // Absolute final position: the target's index shifts left by one when the
+    // source sat above it (removal precedes insertion).
+    let toIdx = targetIdx + (isAbove ? 0 : 1);
+    if (sourceIdx < targetIdx) toIdx -= 1;
+    reorderCell(sourceIdx, toIdx);
 
+    // cleanupDrag() nulls dragSourceId — capture it first so the moved cell
+    // can still be located after the re-render.
+    const droppedId = dragSourceId;
     cleanupDrag();
     rerenderAll();
     saveNotebookDebounced();
 
-    const moved = cells.find((c) => c.id === dragSourceId);
+    const moved = cells.find((c) => c.id === droppedId);
     // In command mode keep the selection ring (rerenderAll restored it);
     // only drop into edit mode when the user was already editing.
     if (moved && moved.cm && !commandMode) {

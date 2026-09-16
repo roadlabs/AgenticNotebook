@@ -118,6 +118,7 @@
       </tbody>
     </table>
     <p class="modal-hint">Tool cell：Edit ▸ New Tool Cell 新建（或 hover cell 点 <code>&lt;/&gt;</code> 转换）；Ctrl+Enter 运行。纯文字 → LLM 生成代码（模式 A）；文字+代码 → 本地真实执行 + 测试 + LLM 评估（模式 B）。已注册的工具在 ⚙ 设置里可见/可删。</p>
+    <p class="modal-hint">内置 notebook 工具：运行普通 cell 时，LLM 可调用 <code>notebook.list_cells / add_cell / delete_cell / move_cell / get_cell / clear_cell_output</code>（单元格索引均为 1-based，与上下文 [Cell N] 一致）；⚙ 设置里可关闭。</p>
     <div class="modal-actions">
       <button type="button" id="help-close">Close</button>
     </div>
@@ -151,6 +152,10 @@
       <label>
         <span>Model</span>
         <input type="text" id="cfg-model" placeholder="agnes-3.0-flash" autocomplete="off" required>
+      </label>
+      <label class="cfg-inline">
+        <span>Allow built-in notebook tools</span>
+        <input type="checkbox" id="cfg-allow-notebook-tools" checked>
       </label>
       <div class="registered-tools-block">
         <span class="registered-tools-title">Registered Tools</span>
