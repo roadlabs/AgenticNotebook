@@ -212,7 +212,9 @@ Respond only to the current cell, using prior cells as background.`;
     }
 
     // Finalize the output area after the (possibly multi-round) stream.
-    function finalize(finalText) {
+    // `error` (optional) marks a failed run: the accumulated text is kept
+    // (if any) and the error is shown as a banner; the cell returns to idle.
+    function finalize(text, error) {
       if (renderTimer) {
         clearTimeout(renderTimer);
         renderTimer = null;
@@ -222,11 +224,17 @@ Respond only to the current cell, using prior cells as background.`;
       // is orphaned then. Resolve the live cell by id (safe no-op if gone).
       const liveCell = cells.find((c) => c.id === id);
       if (!liveCell) return;
-      liveCell.output = finalText;
-      liveCell.outputEl.innerHTML = renderMarkdown(finalText);
+      let out = text || '';
+      if (error) {
+        out = (out ? out + '\n\n' : '') +
+          '<div class="output-error">❌ ' + escapeHtml(String(error)) + '</div>';
+      }
+      liveCell.output = out;
+      liveCell.outputEl.innerHTML = renderMarkdown(out);
       liveCell.status = 'idle';
       liveCell.runBtn.disabled = false;
       liveCell.cellEl.classList.remove('cell-running');
+      if (error) liveCell.cellEl.classList.add('cell-error');
       saveNotebookDebounced();
     }
 
@@ -245,16 +253,23 @@ Respond only to the current cell, using prior cells as background.`;
       tools.push(t);
     }
 
-    await handleToolCallLoop({
-      cell,
-      settings,
-      messages,
-      tools,
-      runningCellId: id,
-      scheduleRender,
-      appendOutputHtml,
-      finalize
-    });
+    try {
+      await handleToolCallLoop({
+        cell,
+        settings,
+        messages,
+        tools,
+        runningCellId: id,
+        scheduleRender,
+        appendOutputHtml,
+        finalize
+      });
+    } catch (err) {
+      // Defensive net: anything the loop itself threw (not the stream path,
+      // which finalizes in its own catch) still restores the cell and shows
+      // the error instead of leaving the cell stuck in the running state.
+      finalize('', err);
+    }
   }
 
   // ------------------------------------------------------------------
@@ -266,7 +281,7 @@ Respond only to the current cell, using prior cells as background.`;
     const MAX_ITER = 8;
 
     for (let iter = 0; iter < MAX_ITER; iter++) {
-      const { content, toolCalls } = await new Promise((resolve, reject) => {
+      const { content, toolCalls, failed } = await new Promise((resolve, reject) => {
         const calls = [];
         llm.streamChatCompletion({
           baseUrl: settings.baseUrl,
@@ -282,8 +297,17 @@ Respond only to the current cell, using prior cells as background.`;
           onError: (err) => reject(err),
           onToolCall: (tc) => calls.push(tc)
         });
+      }).catch((err) => {
+        // The stream failed (missing key / HTTP error / interrupted stream /
+        // provider error). Finalize with the accumulated text plus the error
+        // banner so the output area shows what happened and the cell returns
+        // to an idle, re-runnable state. Mark `failed` so the normal
+        // no-tool-calls path below does NOT finalize again and clobber it.
+        finalize(accumulated, err);
+        return { content: accumulated, toolCalls: [], failed: true };
       });
 
+      if (failed) return;
       if (!toolCalls.length) {
         finalize(accumulated);
         return;
