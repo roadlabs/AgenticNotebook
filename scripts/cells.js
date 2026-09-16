@@ -854,6 +854,8 @@ Return your evaluation as markdown.`;
         cell.status = 'idle';
         cell.runBtn.disabled = false;
         cell.cellEl.classList.remove('cell-running');
+        // Collapse to the rendered-markdown preview now that execution is done.
+        setCellPreview(id, true);
         saveNotebookDebounced();
       },
       onError: async (err) => {
@@ -1613,7 +1615,8 @@ input.focus();
     const settings = await Anb.settings.load();
     const cell = cells.find((c) => c.id === id);
     await runCell(id, settings);
-    // Tool cells keep the editor open (their code stays visible in edit mode)
+    // Tool cells run through handleCtrlEnter (runCell forwards them) which
+    // collapses to preview itself on success — this line only covers md cells.
     if (!cell || cell.type !== 'tool') setCellPreview(id, true);
   }
 
@@ -1622,7 +1625,8 @@ input.focus();
     const cell = cells.find((c) => c.id === id);
     await runCell(id, settings);
 
-    // Tool cells don't auto-collapse to preview (their code stays editable)
+    // Tool cells are forwarded to handleCtrlEnter inside runCell, which
+    // collapses to preview on success — this line only covers md cells.
     if (cell && cell.type === 'tool') return;
 
     const idx = cells.findIndex((c) => c.id === id);
